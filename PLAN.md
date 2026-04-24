@@ -1,6 +1,6 @@
 # Visura — v0 Plan
 
-A Python library for declarative, replayable image generation on top of gpt-image-2. Users author `.visura.toml` files; the library validates, compiles to a tuned prompt, renders via the OpenAI API, and writes a sidecar so every output is traceable, cacheable, and reproducible from Visura's own artifact cache.
+A Python library for declarative, replayable image generation on top of image models. Users author `.visura.toml` files; the library validates, compiles to a model-aware render payload, renders through a backend adapter, and writes a sidecar so every output is traceable, cacheable, and reproducible from Visura's own artifact cache.
 
 ---
 
@@ -10,7 +10,7 @@ A Python library for declarative, replayable image generation on top of gpt-imag
 
 - Write a `.visura.toml`, run `visura render foo.visura.toml`, get an image.
 - Two kinds shipped (one to prove the pattern, one to prove it generalizes).
-- One model backend (gpt-image-2).
+- A model/provider abstraction from day one, with one production-quality bundled backend to keep v0 shippable.
 - Replayable outputs: sidecar metadata + deterministic content-addressable cache from day one.
 - Readable enough that the author reaches for it over typing a prose prompt in ChatGPT.
 
@@ -19,7 +19,7 @@ A Python library for declarative, replayable image generation on top of gpt-imag
 - Inheritance / `extends` — v0.5.
 - Eval suite, optimizer, few-shot cache — v1.
 - LLM-powered linter, authoring assistant, reverse compiler — v1.
-- Multi-model backend — parked until v0 proves itself on one.
+- Full provider feature parity — v1+. v0 proves the abstraction without pretending every image API has the same knobs.
 - Diff renderer — v0.5. The killer feature lands *after* there are real specs to diff.
 
 The cut list is the point. Each parked item is a multi-week rabbit hole; v0 ships without any of them.
@@ -30,7 +30,7 @@ The cut list is the point. Each parked item is a multi-week rabbit hole; v0 ship
 
 - Python 3.11+ (stdlib `tomllib`, modern typing)
 - `pydantic` v2 — schema + validation
-- `openai` — gpt-image-2 client behind a small adapter boundary
+- Provider SDKs behind small backend adapters — start with OpenAI, keep the core provider-neutral
 - `typer` — CLI
 - `pillow` — reference image prep (resize, encode)
 - `uv` — dependency management
@@ -45,7 +45,7 @@ The cut list is the point. Each parked item is a multi-week rabbit hole; v0 ship
 visura/
 ├── pyproject.toml
 ├── README.md
-├── .env.example                     # OPENAI_API_KEY
+├── .env.example                     # provider API key examples
 ├── src/visura/
 │   ├── __init__.py
 │   ├── cli.py                       # typer entrypoint
@@ -55,7 +55,11 @@ visura/
 │   │   ├── __init__.py              # registry + dispatch
 │   │   ├── base.py                  # Kind protocol, shared fragments
 │   │   └── headshot.py              # first kind
-│   ├── render.py                    # backend adapter + reference pipeline
+│   ├── backends/
+│   │   ├── __init__.py              # backend registry + resolver
+│   │   ├── base.py                  # Backend protocol + capabilities
+│   │   └── openai.py                # first bundled backend
+│   ├── render.py                    # backend dispatch + reference pipeline
 │   ├── cache.py                     # content-addressable cache
 │   ├── sidecar.py                   # write .visura.meta.json
 │   └── hashing.py                   # canonical hash of spec + refs + seed
@@ -95,12 +99,13 @@ Get the boring stuff right once so it never blocks real work later.
 
 ### M1 — Spec + loader
 
-The `.visura.toml` format exists and round-trips cleanly through the library. The desired authoring surface drives the schema, but the first schema should settle the important shape: `[content]`, `[style]`, optional `[[references]]`, and an envelope with render controls.
+The `.visura.toml` format exists and round-trips cleanly through the library. The desired authoring surface drives the schema, but the first schema should settle the important shape: `[content]`, `[style]`, optional `[[references]]`, and an envelope with model/provider controls.
 
 **Scope**
-- `spec.py`: pydantic models for `Envelope` (model, seed, size, kind, quality, output_format, background), `Style`, `References`. `content` stays as `dict[str, Any]` at envelope level — kind-specific schemas validate it in M2.
+- `spec.py`: pydantic models for `Envelope` (provider, model, seed, size, kind, quality, output_format, background), `Style`, `References`. `content` stays as `dict[str, Any]` at envelope level — kind-specific schemas validate it in M2.
 - `loader.py`: `tomllib` parse → pydantic validate → typed `Spec` object. Clear errors on malformed input.
 - `kinds/__init__.py`: registry with a `@register("headshot")` decorator. Zero kinds registered at M1 exit — the infrastructure exists, implementations come in M2.
+- `backends/__init__.py`: registry with a bundled OpenAI backend configured as the default, while preserving `provider` as a real spec field.
 - `cli.py`: `visura validate foo.visura.toml` — parses, validates, pretty-prints the resolved spec. No rendering yet.
 - One `examples/my-headshot.visura.toml` hand-written before the schema is finalized (let the desired authoring surface drive the schema).
 
@@ -118,7 +123,9 @@ End-to-end: TOML in, compiled prompt inspectable, PNG out.
 **Scope**
 - `kinds/headshot.py`: kind-specific content schema (`subject`, `pose`, `expression`, `background`, `lighting`) + a compiler function `(envelope, content) -> PromptPayload`. Where `PromptPayload` carries the prompt string, any reference image bytes, and role tags.
 - `kinds/base.py`: shared helpers for style/palette/medium fragments that every kind reuses.
-- `render.py`: thin OpenAI image backend adapter. It owns API shape churn, including whether a render uses generation, edit, or Responses-style image calls. Handles reference image prep: load, resize to supported dims, base64, attach with role context.
+- `backends/base.py`: `ImageBackend` protocol with declared capabilities (references, seed support, output formats, supported sizes, provider-specific options).
+- `backends/openai.py`: first bundled implementation. It owns OpenAI API shape churn, including whether a render uses generation, edit, or Responses-style image calls.
+- `render.py`: provider-neutral dispatcher. It resolves a backend, asks it to normalize/validate render options, and handles shared reference image prep where possible.
 - `cache.py` + `sidecar.py`: minimal first pass wired into render immediately, so paid API calls always leave provenance and repeat runs can hit the artifact cache.
 - `cli.py`: `visura render foo.visura.toml` produces a PNG in the current directory.
 - `cli.py`: `visura compile foo.visura.toml` prints the compiled prompt and resolved render payload without making an API call.
@@ -128,18 +135,19 @@ End-to-end: TOML in, compiled prompt inspectable, PNG out.
 - Compiling the same TOML prints an inspectable prompt without touching the API.
 - Informal A/B: the compiled prompt produces comparable-or-better results than the equivalent prose prompt the author would have written by hand.
 - Reference image pipeline handles both "no references" and "one likeness reference" paths.
-- First render writes a sidecar with spec snapshot, compiled prompt, render hash, model name, seed, timestamp, and output path.
+- First render writes a sidecar with spec snapshot, compiled prompt, render hash, provider, model name, seed, timestamp, and output path.
+- The OpenAI backend is swappable in code without changing kind compilers.
 
 ---
 
 ### M3 — Cache + replayability layer
 
-Deletable outputs. Cacheable re-runs. Honest provenance. Visura guarantees byte-identical artifacts from its own cache; fresh remote regenerations are replay attempts unless the backend explicitly guarantees deterministic image bytes for the pinned model and seed.
+Deletable outputs. Cacheable re-runs. Honest provenance. Visura guarantees byte-identical artifacts from its own cache; fresh remote regenerations are replay attempts unless the selected backend explicitly guarantees deterministic image bytes for the pinned model and seed.
 
 **Scope**
-- `hashing.py`: canonical hash of `(resolved spec + reference image bytes + model name/snapshot when available + seed + compiler version)`. TOML key ordering must not affect hash.
+- `hashing.py`: canonical hash of `(resolved spec + reference image bytes + provider + model name/snapshot when available + seed + compiler version + backend version)`. TOML key ordering must not affect hash.
 - `cache.py`: harden the content-addressable cache keyed on that hash. `--force` flag overrides.
-- `sidecar.py`: expand `foo.visura.meta.json` next to each output PNG with backend request snapshot, final compiled prompt, model name/snapshot when available, seed, hash, timestamp, output file digest, and API cost estimate.
+- `sidecar.py`: expand `foo.visura.meta.json` next to each output PNG with backend request snapshot, final compiled prompt, provider, model name/snapshot when available, seed, hash, timestamp, output file digest, and API cost estimate when available.
 - Render command can restore a deleted PNG from cache without making an API call.
 
 **Exit criteria**
@@ -162,7 +170,7 @@ The surface a stranger would encounter.
 
 **Exit criteria**
 - A stranger can clone the repo, add an API key, run the example TOML, and succeed without asking questions.
-- Error messages for the top 5 likely mistakes (missing key, wrong kind, unreadable reference image, invalid seed, API auth failure) are readable.
+- Error messages for the top 5 likely mistakes (missing key, wrong kind, unreadable reference image, unsupported model option, provider auth failure) are readable.
 
 ---
 
@@ -217,12 +225,12 @@ Make it possible for one more person to use it.
 | v0.5 | `extends`/inheritance, watch mode, diff renderer, 3rd–5th kinds |
 | v1 | Eval suite (promptfoo-style), post-render critic loop, semantic linter |
 | v1.5 | Few-shot bootstrap cache, optimizer (GEPA-style), authoring assistant |
-| v2 | Multi-model backend, kind plugin installs, web UI |
+| v2 | External backend plugins, kind plugin installs, web UI |
 
 ---
 
 ## First three files to write (literal order)
 
 1. `examples/my-headshot.visura.toml` — write the TOML you *wish* existed. Let the desired authoring surface drive the schema, not the other way around.
-2. `src/visura/spec.py` — pydantic models that validate the example you just wrote, including the minimal envelope render controls.
+2. `src/visura/spec.py` — pydantic models that validate the example you just wrote, including the minimal provider/model render controls.
 3. `src/visura/kinds/headshot.py` — the compiler. Start ugly, get it end-to-end, then tighten.
