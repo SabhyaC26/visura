@@ -1,8 +1,8 @@
 # Visura — Product Plan
 
-Visura is a local-first asset generation pipeline for developers.
+Visura is a local-first asset generation pipeline for developers and coding agents.
 
-Developers write `.visura.toml` files next to generated assets, render them locally or in CI, cache unchanged outputs, and keep sidecar metadata so every generated image is traceable. Paid image APIs are optional production backends, not required for day-to-day development.
+Developers and agents write `.visura.toml` files next to generated assets, render them locally or in CI, cache unchanged outputs, and keep sidecar metadata so every generated image is traceable. Paid image APIs are optional production backends, not required for day-to-day development.
 
 The core promise:
 
@@ -23,8 +23,9 @@ Visura is useful when a project needs:
 - Cache hits for unchanged specs.
 - Sidecar metadata that records prompt, provider, model, options, references, hash, and output digest.
 - A path from rough local previews to higher-quality production renders.
+- A CLI that coding agents can call safely while editing a repo.
 
-The project should be judged by whether a developer would rather keep image assets in Visura specs than lose them inside one-off prompts, chat threads, or ad hoc scripts.
+The project should be judged by whether a developer or coding agent would rather keep image assets in Visura specs than lose them inside one-off prompts, chat threads, or ad hoc scripts.
 
 ---
 
@@ -38,6 +39,17 @@ visura compile assets/og-home.visura.toml
 visura render assets/**/*.visura.toml
 visura status
 ```
+
+The human-friendly CLI and agent-friendly CLI should be the same commands with different output modes:
+
+```bash
+visura status assets/ --json
+visura compile assets/og-home.visura.toml --json
+visura render assets/ --json --yes
+visura render assets/ --dry-run --json
+```
+
+Coding agents should be able to use Visura without scraping prose logs, guessing output paths, or accidentally triggering paid API calls.
 
 Typical spec:
 
@@ -80,6 +92,7 @@ Backends:
 - Cache by default: unchanged specs should not regenerate or spend money.
 - Provenance by default: every output should have a sidecar.
 - Asset-oriented: specs should know where outputs live in a real repo.
+- Agent-friendly: every command should have stable machine-readable output and predictable side effects.
 - Provider-neutral, not provider-blind: backends can expose different capabilities, but the user should get clear validation errors.
 
 ---
@@ -105,6 +118,7 @@ v0 should deliver the smallest complete workflow a developer can actually use:
 - `visura compile`
 - `visura render`
 - `visura status`
+- JSON output modes for agent callers
 - `mock` backend
 - first local `diffusers` backend path
 - output path support
@@ -124,6 +138,52 @@ v0 should not spend time on:
 - Complex inheritance.
 
 Those become useful after the basic asset loop is solid.
+
+---
+
+## Agent-Friendly CLI Contract
+
+Coding agents such as Codex, Claude Code, and other repo-editing tools are first-class users. They need commands that are deterministic, inspectable, and easy to recover from.
+
+Every command should support:
+
+- `--json` for stable machine-readable output.
+- `--quiet` for minimal logs.
+- Clear exit codes.
+- No progress spinners or interactive prompts when stdout is not a TTY.
+- Absolute or repo-relative file paths in JSON output.
+- Structured errors with code, message, path, and field location when available.
+
+Commands that can spend money or overwrite files should support:
+
+- `--dry-run` to report planned actions.
+- `--yes` or `--no-confirm` to make intentional non-interactive execution explicit.
+- `--max-cost` once paid backends can estimate cost.
+- `--provider` and `--model` overrides so agents can force `mock` or local providers during development.
+- Cache-first defaults so reruns are safe.
+
+JSON output should be stable enough for agents to parse across patch releases. Human-readable text can improve over time; JSON shape should be versioned.
+
+Example render result:
+
+```json
+{
+  "schema_version": "0.1",
+  "command": "render",
+  "ok": true,
+  "results": [
+    {
+      "spec_path": "assets/og-home.visura.toml",
+      "output_path": "assets/og-home.png",
+      "sidecar_path": "assets/og-home.visura.json",
+      "provider": "mock",
+      "model": "placeholder",
+      "cache": "hit",
+      "render_hash": "sha256:..."
+    }
+  ]
+}
+```
 
 ---
 
@@ -264,7 +324,32 @@ Exit criteria:
 
 ---
 
-### M6 — Local Diffusers Backend
+### M6 — Agent-Friendly CLI
+
+Make Visura easy and safe for coding agents to operate.
+
+Scope:
+
+- Add `--json` to `validate`, `compile`, `render`, and `status`.
+- Define a versioned JSON response schema.
+- Add structured error objects with stable error codes.
+- Add `--dry-run` for commands with file or cost side effects.
+- Add explicit non-interactive flags for commands that overwrite files or may spend money.
+- Add provider/model overrides so agents can force `mock` during development.
+- Document exit codes and command contracts.
+- Ensure logs and progress output go to stderr when JSON is written to stdout.
+
+Exit criteria:
+
+- An agent can run `visura status --json` and decide which specs need rendering.
+- An agent can run `visura render --dry-run --json` and report planned file changes without writing outputs.
+- An agent can force `provider = "mock"` from the CLI to avoid paid calls.
+- JSON output includes all file paths and cache decisions needed for follow-up edits.
+- Tests cover JSON success and error responses.
+
+---
+
+### M7 — Local Diffusers Backend
 
 Add a real local image backend for cheap iteration.
 
@@ -284,7 +369,7 @@ Exit criteria:
 
 ---
 
-### M7 — Paid Backend Polish
+### M8 — Paid Backend Polish
 
 Make OpenAI useful after the local loop already works.
 
@@ -304,7 +389,7 @@ Exit criteria:
 
 ---
 
-### M8 — Docs And Distribution
+### M9 — Docs And Distribution
 
 Make the project understandable to a stranger.
 
@@ -339,6 +424,7 @@ Exit criteria:
 ## Success Criteria
 
 - A developer can use Visura without any paid API key.
+- Coding agents can use Visura through stable JSON output and non-interactive flags.
 - `mock` backend is fast and deterministic enough for CI.
 - Local Diffusers renders are documented and usable.
 - Rendering unchanged specs is a cache hit.
