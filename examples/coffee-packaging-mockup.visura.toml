@@ -1,0 +1,17 @@
+kind = "product_mockup"
+provider = "openai"
+model = "gpt-image-1"
+size = "1024x1024"
+quality = "high"
+output_format = "png"
+
+[style]
+medium = "premium product photography"
+mood = "bright, tactile, modern"
+palette = ["forest green", "cream", "copper"]
+
+[content]
+product = "stand-up pouch for a small-batch coffee brand named Northstar"
+surface = "matte pouch with a small copper label and simple star mark"
+scene = "on a stone counter beside a ceramic cup and scattered coffee beans"
+lighting = "soft morning window light with crisp but natural shadows"

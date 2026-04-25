@@ -15,7 +15,17 @@ def write_spec(tmp_path: Path, text: str) -> Path:
     return path
 
 
-def test_loads_example_spec() -> None:
+@pytest.mark.parametrize("example_path", sorted(Path("examples").glob("*.visura.toml")))
+def test_loads_example_specs(example_path: Path) -> None:
+    spec = load_spec(example_path)
+
+    assert spec.kind
+    assert spec.provider
+    assert spec.model
+    assert spec.content
+
+
+def test_loads_headshot_example_content() -> None:
     spec = load_spec("examples/my-headshot.visura.toml")
 
     assert spec.kind == "headshot"

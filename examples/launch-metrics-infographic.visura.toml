@@ -1,0 +1,18 @@
+kind = "infographic"
+provider = "openai"
+model = "gpt-image-1"
+size = "1024x1536"
+quality = "high"
+output_format = "png"
+background = "opaque"
+
+[style]
+medium = "editorial business infographic"
+mood = "clear, energetic, credible"
+palette = ["ink black", "electric blue", "mint", "warm gray"]
+
+[content]
+title = "Launch Week Snapshot"
+sections = ["12.4k signups", "38% activation", "4.8k images rendered", "92% cache hit rate"]
+layout = "vertical poster with four metric blocks and one simple upward trend chart"
+constraints = "large readable numbers, minimal copy, no fake logos, clean grid"

@@ -1,0 +1,19 @@
+kind = "poster"
+provider = "openai"
+model = "gpt-image-1"
+size = "1024x1536"
+quality = "medium"
+output_format = "png"
+
+[style]
+medium = "risograph event poster"
+mood = "hands-on, lively, approachable"
+palette = ["tomato red", "deep teal", "warm paper", "black"]
+notes = "Slight ink texture, bold shapes, and simple type hierarchy."
+
+[content]
+event = "Prompt Craft Night"
+headline = "Make Images That Listen"
+details = "Friday, 7 PM, Studio 12"
+visual = "overhead view of hands arranging paper prompt cards around a glowing monitor"
+constraints = "clear headline, playful composition, no tiny body copy"

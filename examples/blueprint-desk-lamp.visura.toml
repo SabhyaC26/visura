@@ -1,0 +1,18 @@
+kind = "blueprint"
+provider = "openai"
+model = "gpt-image-1"
+size = "1536x1024"
+quality = "high"
+output_format = "png"
+background = "opaque"
+
+[style]
+medium = "technical blueprint"
+mood = "precise, calm, engineered"
+palette = ["blueprint navy", "white", "cyan"]
+
+[content]
+object = "adjustable architect desk lamp"
+view = "orthographic front view with one small exploded detail"
+labels = ["weighted base", "hinged arm", "dimmable shade", "braided power cord"]
+constraints = "clean linework, accurate arrows, legible labels, generous margins"
