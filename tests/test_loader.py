@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from visura.backends import registered_backends
+from visura.backends import get_backend, registered_backends
 from visura.kinds import registered_kinds
 from visura.loader import SpecLoadError, load_spec
+from visura.spec import Spec
 
 
 def write_spec(tmp_path: Path, text: str) -> Path:
@@ -100,4 +101,45 @@ def test_m1_has_no_registered_kinds_yet() -> None:
 
 
 def test_default_backend_is_registered() -> None:
-    assert registered_backends() == ("openai",)
+    assert registered_backends() == ("bfl", "openai")
+
+
+def test_bfl_backend_accepts_flux_klein() -> None:
+    spec = Spec(
+        kind="product_mockup",
+        provider="bfl",
+        model="flux-2-klein-4b",
+        size="1024x1024",
+        output_format="png",
+        content={"product": "desk lamp"},
+    )
+
+    get_backend("bfl").validate_options(spec)
+
+
+def test_bfl_backend_rejects_webp() -> None:
+    spec = Spec(
+        kind="product_mockup",
+        provider="bfl",
+        model="flux-2-klein-4b",
+        size="1024x1024",
+        output_format="webp",
+        content={"product": "desk lamp"},
+    )
+
+    with pytest.raises(ValueError, match="Unsupported output format for bfl: webp"):
+        get_backend("bfl").validate_options(spec)
+
+
+def test_bfl_backend_rejects_non_multiple_of_16_size() -> None:
+    spec = Spec(
+        kind="product_mockup",
+        provider="bfl",
+        model="flux-2-klein-4b",
+        size="1025x1024",
+        output_format="png",
+        content={"product": "desk lamp"},
+    )
+
+    with pytest.raises(ValueError, match="dimensions must be multiples of 16"):
+        get_backend("bfl").validate_options(spec)

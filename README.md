@@ -32,7 +32,7 @@ Implemented today:
 - `visura validate <path>` CLI command
 - Example specs for headshots, product mockups, posters, blueprints, and
   infographics
-- OpenAI backend capability scaffold
+- OpenAI and Black Forest Labs backend capability scaffolds
 
 Not implemented yet:
 
@@ -163,7 +163,8 @@ Supported top-level fields:
 - `kind` - required string. Names the type of image spec, such as `headshot` or
   `infographic`.
 - `model` - required string. The provider model name.
-- `provider` - optional string, defaults to `openai`.
+- `provider` - optional string, defaults to `openai`. Registered providers are
+  `openai` and `bfl`.
 - `size` - optional string, defaults to `1024x1024`.
 - `seed` - optional integer.
 - `quality` - optional string.
@@ -178,6 +179,30 @@ Supported top-level fields:
 
 Unknown top-level fields and unknown fields inside `style` or `references` are
 rejected so typos fail fast.
+
+### Black Forest Labs
+
+Use `provider = "bfl"` for Black Forest Labs FLUX models. Model names map to BFL
+API endpoint names, so cheap FLUX.2 [klein] iteration can use
+`model = "flux-2-klein-4b"` or `model = "flux-2-klein-9b-preview"`.
+
+```toml
+kind = "product_mockup"
+provider = "bfl"
+model = "flux-2-klein-4b"
+size = "1024x1024"
+seed = 1234
+output_format = "png"
+
+[content]
+product = "a compact desk lamp with brushed aluminum joints"
+scene = "on a walnut desk beside a notebook and matte black pen"
+lighting = "soft afternoon window light"
+```
+
+BFL text-to-image sizes must be `WIDTHxHEIGHT`, use dimensions that are
+multiples of 16, and stay within the documented 64x64 minimum and 4 megapixel
+maximum. BFL currently accepts `png` and `jpeg` output formats in Visura.
 
 ## Examples
 

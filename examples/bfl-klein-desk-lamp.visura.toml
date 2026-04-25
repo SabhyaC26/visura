@@ -1,0 +1,16 @@
+kind = "product_mockup"
+provider = "bfl"
+model = "flux-2-klein-4b"
+size = "1024x1024"
+seed = 1234
+output_format = "png"
+
+[style]
+medium = "clean product photography"
+mood = "warm, precise, minimal"
+palette = ["brushed aluminum", "walnut", "matte black"]
+
+[content]
+product = "a compact desk lamp with brushed aluminum joints"
+scene = "on a walnut desk beside a notebook and matte black pen"
+lighting = "soft afternoon window light"

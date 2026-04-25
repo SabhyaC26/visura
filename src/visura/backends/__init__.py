@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from visura.backends.base import BackendCapabilities, ImageBackend
+from visura.backends.bfl import BFLBackend
 from visura.backends.openai import OpenAIBackend
 
 _REGISTRY: dict[str, ImageBackend] = {
+    BFLBackend.name: BFLBackend(),
     OpenAIBackend.name: OpenAIBackend(),
 }
 
