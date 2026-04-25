@@ -104,3 +104,56 @@ headline = "Make Images That Listen"
         assert result.exit_code == 0
         assert Path("assets/poster.png").exists()
         assert '"output_path": "assets/poster.png"' in result.stdout
+
+
+def test_render_paid_provider_requires_yes(tmp_path: Path) -> None:
+    spec_path = tmp_path / "product.visura.toml"
+    spec_path.write_text(
+        """
+kind = "product_mockup"
+provider = "bfl"
+model = "flux-2-klein-4b"
+size = "1024x1024"
+output_format = "png"
+
+[output]
+path = "assets/product.png"
+alt = "Product mockup."
+
+[content]
+product = "desk lamp"
+""",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["render", str(spec_path)])
+
+    assert result.exit_code == 1
+    assert "requires --yes" in result.stderr
+
+
+def test_render_bfl_requires_api_key_with_yes(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("BFL_API_KEY", raising=False)
+    spec_path = tmp_path / "product.visura.toml"
+    spec_path.write_text(
+        """
+kind = "product_mockup"
+provider = "bfl"
+model = "flux-2-klein-4b"
+size = "1024x1024"
+output_format = "png"
+
+[output]
+path = "assets/product.png"
+alt = "Product mockup."
+
+[content]
+product = "desk lamp"
+""",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["render", str(spec_path), "--yes"])
+
+    assert result.exit_code == 1
+    assert "BFL_API_KEY is required" in result.stderr

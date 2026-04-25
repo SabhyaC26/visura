@@ -39,7 +39,7 @@ Implemented today:
 
 Not implemented yet:
 
-- Provider API calls for rendering
+- OpenAI API calls for rendering
 - Cache restoration and render sidecar metadata
 - Diffusers/local model rendering
 
@@ -231,6 +231,13 @@ lighting = "soft afternoon window light"
 BFL text-to-image sizes must be `WIDTHxHEIGHT`, use dimensions that are
 multiples of 16, and stay within the documented 64x64 minimum and 4 megapixel
 maximum. BFL currently accepts `png` and `jpeg` output formats in Visura.
+
+Render through BFL by setting `BFL_API_KEY` and passing `--yes` to acknowledge
+that this command can spend credits:
+
+```bash
+BFL_API_KEY=... uv run visura render examples/bfl-klein-desk-lamp.visura.toml --yes
+```
 
 ### Mock Rendering
 

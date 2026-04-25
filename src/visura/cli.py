@@ -7,6 +7,7 @@ import typer
 
 from visura import __version__
 from visura.backends import get_backend
+from visura.backends.bfl import BFLRenderError
 from visura.compiler import CompileError, compile_spec
 from visura.loader import SpecLoadError, load_spec
 
@@ -58,7 +59,14 @@ def compile(path: Path) -> None:
 
 
 @app.command()
-def render(path: Path) -> None:
+def render(
+    path: Path,
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Allow rendering with paid or networked providers.",
+    ),
+) -> None:
     """Render a spec with a supported local backend."""
     try:
         spec = load_spec(path)
@@ -68,12 +76,20 @@ def render(path: Path) -> None:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
 
-    if spec.provider != "mock":
-        typer.echo("Rendering is currently implemented only for provider: mock", err=True)
+    if spec.provider != "mock" and not yes:
+        typer.echo(
+            "Rendering with paid or networked providers requires --yes.",
+            err=True,
+        )
         raise typer.Exit(1)
 
     output_path = Path(spec.output.path)
-    backend.render(spec, payload, output_path)
+    try:
+        backend.render(spec, payload, output_path)
+    except (BFLRenderError, ValueError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
     result = {
         "spec_path": str(path),
         "output_path": str(output_path),
