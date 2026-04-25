@@ -1,79 +1,129 @@
-# Visura — v0 Plan
+# Visura — Product Plan
 
-A Python library for declarative, replayable image generation on top of image models. Users author `.visura.toml` files; the library validates, compiles to a model-aware render payload, renders through a backend adapter, and writes a sidecar so every output is traceable, cacheable, and reproducible from Visura's own artifact cache.
+Visura is a local-first asset generation pipeline for developers.
+
+Developers write `.visura.toml` files next to generated assets, render them locally or in CI, cache unchanged outputs, and keep sidecar metadata so every generated image is traceable. Paid image APIs are optional production backends, not required for day-to-day development.
+
+The core promise:
+
+> Keep generated image assets in your repo as source-controlled specs. Render cheaply with mock or local open models, use paid APIs only when final quality is worth the cost, and always know what produced each artifact.
 
 ---
 
-## Scope
+## Why Developers Would Care
 
-### v0 is
+Typing a prompt into an image UI is fine once. It breaks down when images become part of a codebase.
 
-- Write a `.visura.toml`, run `visura render foo.visura.toml`, get an image.
-- Two kinds shipped (one to prove the pattern, one to prove it generalizes).
-- A model/provider abstraction from day one, with one production-quality bundled backend to keep v0 shippable.
-- Replayable outputs: sidecar metadata + deterministic content-addressable cache from day one.
-- Readable enough that the author reaches for it over typing a prose prompt in ChatGPT.
+Visura is useful when a project needs:
 
-### v0 is NOT
+- Versioned image intent that can be reviewed in pull requests.
+- Repeatable asset generation for docs, apps, marketing pages, demos, and prototypes.
+- Cheap local iteration without spending money on image model APIs.
+- Deterministic mock renders for tests and CI.
+- Cache hits for unchanged specs.
+- Sidecar metadata that records prompt, provider, model, options, references, hash, and output digest.
+- A path from rough local previews to higher-quality production renders.
 
-- Inheritance / `extends` — v0.5.
-- Eval suite, optimizer, few-shot cache — v1.
-- LLM-powered linter, authoring assistant, reverse compiler — v1.
-- Full provider feature parity — v1+. v0 proves the abstraction without pretending every image API has the same knobs.
-- Diff renderer — v0.5. The killer feature lands *after* there are real specs to diff.
+The project should be judged by whether a developer would rather keep image assets in Visura specs than lose them inside one-off prompts, chat threads, or ad hoc scripts.
 
-The cut list is the point. Each parked item is a multi-week rabbit hole; v0 ships without any of them.
+---
+
+## Product Shape
+
+Visura is not just a prompt format. It is an asset workflow:
+
+```bash
+visura validate assets/**/*.visura.toml
+visura compile assets/og-home.visura.toml
+visura render assets/**/*.visura.toml
+visura status
+```
+
+Typical spec:
+
+```toml
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "1024x1536"
+quality = "draft"
+
+[output]
+path = "assets/events/prompt-craft-night.png"
+alt = "Poster for Prompt Craft Night workshop"
+
+[style]
+medium = "risograph event poster"
+mood = "hands-on, lively, approachable"
+palette = ["tomato red", "deep teal", "warm paper", "black"]
+
+[content]
+headline = "Make Images That Listen"
+details = "Friday, 7 PM, Studio 12"
+visual = "hands arranging paper prompt cards around a glowing monitor"
+constraints = "clear headline, playful composition, no tiny body copy"
+```
+
+Backends:
+
+- `mock`: deterministic local placeholder PNGs, always available, CI-friendly.
+- `diffusers`: local Hugging Face Diffusers backend for cheap real-image iteration.
+- `openai`: paid production-quality backend.
+
+---
+
+## Principles
+
+- Local-first: every core workflow must work without a paid API key.
+- Render early: the project becomes useful only when it produces files.
+- Inspectable: `compile` should show exactly what Visura will send to a backend.
+- Cache by default: unchanged specs should not regenerate or spend money.
+- Provenance by default: every output should have a sidecar.
+- Asset-oriented: specs should know where outputs live in a real repo.
+- Provider-neutral, not provider-blind: backends can expose different capabilities, but the user should get clear validation errors.
 
 ---
 
 ## Stack
 
-- Python 3.11+ (stdlib `tomllib`, modern typing)
-- `pydantic` v2 — schema + validation
-- Provider SDKs behind small backend adapters — start with OpenAI, keep the core provider-neutral
-- `typer` — CLI
-- `pillow` — reference image prep (resize, encode)
-- `uv` — dependency management
-- `ruff` — lint + format
-- `pytest` — tests
+- Python 3.11+
+- `pydantic` v2 for schema and validation
+- `typer` for CLI
+- `pillow` for mock rendering, output inspection, and reference prep
+- Hugging Face `diffusers` as an optional local backend dependency
+- OpenAI SDK as an optional paid backend dependency
+- `uv` for dependency management
+- `ruff` and `pytest` for development
 
 ---
 
-## Repo layout
+## Revised v0 Scope
 
-```
-visura/
-├── pyproject.toml
-├── README.md
-├── .env.example                     # provider API key examples
-├── src/visura/
-│   ├── __init__.py
-│   ├── cli.py                       # typer entrypoint
-│   ├── spec.py                      # pydantic: Envelope, Style, References
-│   ├── loader.py                    # parse + validate .visura.toml → Spec
-│   ├── kinds/
-│   │   ├── __init__.py              # registry + dispatch
-│   │   ├── base.py                  # Kind protocol, shared fragments
-│   │   └── headshot.py              # first kind
-│   ├── backends/
-│   │   ├── __init__.py              # backend registry + resolver
-│   │   ├── base.py                  # Backend protocol + capabilities
-│   │   └── openai.py                # first bundled backend
-│   ├── render.py                    # backend dispatch + reference pipeline
-│   ├── cache.py                     # content-addressable cache
-│   ├── sidecar.py                   # write .visura.meta.json
-│   └── hashing.py                   # canonical hash of spec + refs + seed
-├── examples/
-│   ├── my-headshot.visura.toml
-│   └── blueprint.visura.toml
-└── tests/
-    ├── test_loader.py
-    ├── test_compiler_headshot.py
-    ├── test_cache.py
-    └── fixtures/
-        ├── headshot-minimal.visura.toml
-        └── ref-selfie.jpg
-```
+v0 should deliver the smallest complete workflow a developer can actually use:
+
+- `visura validate`
+- `visura compile`
+- `visura render`
+- `visura status`
+- `mock` backend
+- first local `diffusers` backend path
+- output path support
+- sidecar metadata
+- content-addressed cache
+- batch rendering over files/directories/globs
+- one or two useful kinds
+
+v0 should not spend time on:
+
+- Many kinds.
+- Plugin installs.
+- Prompt optimization.
+- LLM linting.
+- Diff renderer UI.
+- Full provider feature parity.
+- Complex inheritance.
+
+Those become useful after the basic asset loop is solid.
 
 ---
 
@@ -81,156 +131,217 @@ visura/
 
 ### M0 — Foundation
 
-Get the boring stuff right once so it never blocks real work later.
+Current status: implemented.
 
-**Scope**
-- Project scaffold via `uv init`.
-- `pyproject.toml` with deps, CLI entrypoint, package metadata.
-- `ruff` config, `pytest` config.
-- GitHub Actions CI: lint + test on push.
-- `.env.example`, `.gitignore`.
+Scope:
 
-**Exit criteria**
-- `uv sync && uv run pytest` runs (one no-op test passing).
-- `uv run visura --help` prints help text.
-- CI green on an empty PR.
+- Python package scaffold.
+- CLI entrypoint.
+- `validate` command.
+- Pydantic spec loader.
+- OpenAI backend skeleton.
+- Kind/backend registries.
+- Example `.visura.toml` files.
+- Tests and lint configuration.
 
----
+Exit criteria:
 
-### M1 — Spec + loader
-
-The `.visura.toml` format exists and round-trips cleanly through the library. The desired authoring surface drives the schema, but the first schema should settle the important shape: `[content]`, `[style]`, optional `[[references]]`, and an envelope with model/provider controls.
-
-**Scope**
-- `spec.py`: pydantic models for `Envelope` (provider, model, seed, size, kind, quality, output_format, background), `Style`, `References`. `content` stays as `dict[str, Any]` at envelope level — kind-specific schemas validate it in M2.
-- `loader.py`: `tomllib` parse → pydantic validate → typed `Spec` object. Clear errors on malformed input.
-- `kinds/__init__.py`: registry with a `@register("headshot")` decorator. Zero kinds registered at M1 exit — the infrastructure exists, implementations come in M2.
-- `backends/__init__.py`: registry with a bundled OpenAI backend configured as the default, while preserving `provider` as a real spec field.
-- `cli.py`: `visura validate foo.visura.toml` — parses, validates, pretty-prints the resolved spec. No rendering yet.
-- One `examples/my-headshot.visura.toml` hand-written before the schema is finalized (let the desired authoring surface drive the schema).
-
-**Exit criteria**
-- `visura validate examples/my-headshot.visura.toml` succeeds.
-- `visura validate` on a malformed TOML surfaces a pinpoint error.
-- Tests cover: happy path, missing required field, wrong type, unknown top-level key.
+- `uv run pytest` passes.
+- `uv run visura --help` works.
+- `uv run visura validate examples/my-headshot.visura.toml` prints resolved JSON.
 
 ---
 
-### M2 — First compiler + render pipeline
+### M1 — Asset Spec Shape
 
-End-to-end: TOML in, compiled prompt inspectable, PNG out.
+Update the schema so specs describe assets, not only prompts.
 
-**Scope**
-- `kinds/headshot.py`: kind-specific content schema (`subject`, `pose`, `expression`, `background`, `lighting`) + a compiler function `(envelope, content) -> PromptPayload`. Where `PromptPayload` carries the prompt string, any reference image bytes, and role tags.
-- `kinds/base.py`: shared helpers for style/palette/medium fragments that every kind reuses.
-- `backends/base.py`: `ImageBackend` protocol with declared capabilities (references, seed support, output formats, supported sizes, provider-specific options).
-- `backends/openai.py`: first bundled implementation. It owns OpenAI API shape churn, including whether a render uses generation, edit, or Responses-style image calls.
-- `render.py`: provider-neutral dispatcher. It resolves a backend, asks it to normalize/validate render options, and handles shared reference image prep where possible.
-- `cache.py` + `sidecar.py`: minimal first pass wired into render immediately, so paid API calls always leave provenance and repeat runs can hit the artifact cache.
-- `cli.py`: `visura render foo.visura.toml` produces a PNG in the current directory.
-- `cli.py`: `visura compile foo.visura.toml` prints the compiled prompt and resolved render payload without making an API call.
+Scope:
 
-**Exit criteria**
-- Rendering a real headshot TOML produces an image the author would actually use.
-- Compiling the same TOML prints an inspectable prompt without touching the API.
-- Informal A/B: the compiled prompt produces comparable-or-better results than the equivalent prose prompt the author would have written by hand.
-- Reference image pipeline handles both "no references" and "one likeness reference" paths.
-- First render writes a sidecar with spec snapshot, compiled prompt, render hash, provider, model name, seed, timestamp, and output path.
-- The OpenAI backend is swappable in code without changing kind compilers.
+- Add `[output]` with `path`, `alt`, and optional `name`.
+- Keep `[content]` flexible for now.
+- Preserve `[style]` and `[[references]]`.
+- Validate output path shape without forcing files to exist.
+- Update examples to include output paths.
+
+Exit criteria:
+
+- Existing examples validate after migration.
+- Validation catches unknown keys, bad output formats, and invalid reference declarations.
+- The README shows the asset-as-code workflow.
 
 ---
 
-### M3 — Cache + replayability layer
+### M2 — Compile
 
-Deletable outputs. Cacheable re-runs. Honest provenance. Visura guarantees byte-identical artifacts from its own cache; fresh remote regenerations are replay attempts unless the selected backend explicitly guarantees deterministic image bytes for the pinned model and seed.
+Make the model payload inspectable without rendering.
 
-**Scope**
-- `hashing.py`: canonical hash of `(resolved spec + reference image bytes + provider + model name/snapshot when available + seed + compiler version + backend version)`. TOML key ordering must not affect hash.
-- `cache.py`: harden the content-addressable cache keyed on that hash. `--force` flag overrides.
-- `sidecar.py`: expand `foo.visura.meta.json` next to each output PNG with backend request snapshot, final compiled prompt, provider, model name/snapshot when available, seed, hash, timestamp, output file digest, and API cost estimate when available.
-- Render command can restore a deleted PNG from cache without making an API call.
+Scope:
 
-**Exit criteria**
-- Running the same TOML twice is one API call. Second run logs "cache hit".
-- Deleting the PNG and re-rendering restores an identical cached artifact when the cache entry exists.
-- `--force` bypasses cache, makes a fresh API call, and records the new artifact digest in the sidecar.
-- Opening the sidecar reveals everything needed to understand what was generated and why.
+- Add `visura compile`.
+- Add a `PromptPayload` model with prompt, negative prompt when supported, options, references, and output metadata.
+- Implement the first kind compiler, likely `poster` or `product_mockup`.
+- Add shared style/content helpers for prompt fragments.
+- Print JSON by default; optionally support a human-readable format later.
 
----
+Exit criteria:
 
-### M4 — CLI polish
-
-The surface a stranger would encounter.
-
-**Scope**
-- Flags: `--output-dir`, `--force`, `--seed` (override), and `render --dry-run` as an alias for `compile`.
-- `visura validate` and `visura render` both surface useful errors — no raw pydantic tracebacks reaching the user.
-- `visura --version` returns the package version.
-- Exit codes: 0 success, 1 validation error, 2 API error, 3 cache/IO error.
-
-**Exit criteria**
-- A stranger can clone the repo, add an API key, run the example TOML, and succeed without asking questions.
-- Error messages for the top 5 likely mistakes (missing key, wrong kind, unreadable reference image, unsupported model option, provider auth failure) are readable.
+- `visura compile examples/workshop-poster.visura.toml` prints the compiled prompt and backend options.
+- No API calls are made by compile.
+- Tests cover successful compile, unknown kind, and invalid kind-specific content.
 
 ---
 
-### M5 — Second kind
+### M3 — Mock Render Backend
 
-Prove the abstraction generalizes. Prefer the second kind that produces three genuinely useful examples fastest. `blueprint` or `infographic` are high-upside because they stress labels, layout, and in-image text; `product_mockup`, `poster`, or `album_cover` are lower-risk if the abstraction itself is the thing being tested.
+Make rendering work with zero external services.
 
-**Scope**
-- New kind module under `kinds/`.
-- Kind-specific content schema.
-- Compiler that reuses `kinds/base.py` fragments but adds kind-specific instructions.
-- Example TOML under `examples/`.
+Scope:
 
-**Exit criteria**
-- Two kinds coexist with zero cross-contamination in code.
-- Both produce output the author is happy with.
-- Adding a third kind (hypothetically) requires no changes outside `kinds/`.
+- Add `provider = "mock"`.
+- Implement deterministic Pillow PNG generation.
+- Placeholder image should include useful debug information: kind, output path, size, prompt hash, provider, model, and a short prompt excerpt.
+- Support requested size and output format where practical.
+- Add `visura render`.
 
----
+Exit criteria:
 
-### M6 — Docs + publish
-
-Make it possible for one more person to use it.
-
-**Scope**
-- README: install, quickstart, one before/after (prose prompt vs. TOML) per kind, cache/replayability demo, deferred-features list.
-- Docstrings on public API surface (`render`, `validate`, `Spec`).
-- Publish to PyPI as `visura`.
-- License (MIT or Apache 2.0).
-
-**Exit criteria**
-- `pip install visura && visura render foo.visura.toml` works for a stranger.
-- The README answers: what is this, why does it exist, how do I try it in 60 seconds, what's *not* here yet.
+- `visura render examples/workshop-poster.visura.toml` writes a PNG without network access.
+- Output is deterministic for the same resolved spec.
+- Tests can render through `mock` in CI.
 
 ---
 
-## Success criteria for v0
+### M4 — Cache And Sidecars
 
-- [ ] 5+ TOMLs in `examples/` that the author actually wants to keep.
-- [ ] Re-running any example is a cache hit (zero API cost).
-- [ ] Sidecar metadata is sufficient to understand and replay the render; the cache is sufficient to restore the exact image bytes.
-- [ ] Any TOML is < 20 lines for a non-trivial image, and more readable than the prose equivalent.
-- [ ] Informally: the compiled prompt produces comparable-or-better results than the prose prompt the author would have written.
-- [ ] Two kinds shipped, both dogfooded.
+Make the workflow affordable and traceable.
+
+Scope:
+
+- Compute a canonical render hash from resolved spec, compiled prompt, references, provider, model, seed, compiler version, and backend version.
+- Store rendered artifacts in a content-addressed cache.
+- Restore outputs from cache when possible.
+- Write sidecars next to outputs.
+- Add `--force` to bypass cache.
+
+Sidecar should include:
+
+- Spec snapshot.
+- Compiled prompt.
+- Provider and model.
+- Backend options.
+- Render hash.
+- Reference file digests.
+- Output path.
+- Output digest.
+- Timestamp.
+- Cache hit/miss.
+
+Exit criteria:
+
+- Rendering the same spec twice uses one generation and one cache hit.
+- Deleting an output and rerendering restores from cache.
+- Sidecar metadata is enough to understand what happened without reading logs.
 
 ---
 
-## Deferred list (pin this)
+### M5 — Batch And Status
+
+Make Visura useful in real repos with many assets.
+
+Scope:
+
+- Accept files, directories, and globs.
+- Add `visura status`.
+- Report missing outputs, stale outputs, cache hits available, and specs that validate.
+- Make command output concise enough for CI logs.
+
+Exit criteria:
+
+- `visura render assets/` renders every spec under the directory.
+- `visura status assets/` identifies stale or missing artifacts.
+- CI can run `visura status --check` and fail when generated assets are out of date.
+
+---
+
+### M6 — Local Diffusers Backend
+
+Add a real local image backend for cheap iteration.
+
+Scope:
+
+- Add optional Diffusers dependencies.
+- Support a tiny test model for plumbing, such as `hf-internal-testing/tiny-stable-diffusion-pipe`.
+- Document `stabilityai/sdxl-turbo` as the practical local draft-quality model.
+- Normalize common options: size, seed, steps, guidance scale, device, dtype.
+- Cache loaded pipelines within a process.
+
+Exit criteria:
+
+- A developer can render locally without an API key.
+- Tiny Diffusers pipeline can be exercised in tests or marked integration tests.
+- SDXL Turbo docs include a known-good command for machines with compatible hardware.
+
+---
+
+### M7 — Paid Backend Polish
+
+Make OpenAI useful after the local loop already works.
+
+Scope:
+
+- Implement OpenAI rendering behind the same render interface.
+- Validate unsupported options clearly.
+- Support references where the backend supports them.
+- Record request metadata in the sidecar.
+- Ensure cache prevents accidental repeat paid calls.
+
+Exit criteria:
+
+- Switching a spec from `provider = "mock"` or `provider = "diffusers"` to `provider = "openai"` requires minimal changes.
+- Paid renders always write sidecars.
+- Re-running unchanged paid specs hits cache by default.
+
+---
+
+### M8 — Docs And Distribution
+
+Make the project understandable to a stranger.
+
+Scope:
+
+- README quickstart with mock render first.
+- Local Diffusers guide.
+- Paid backend guide.
+- Asset workflow examples for docs images, product mockups, posters, OG images, and demo data.
+- License.
+- Publish package when the v0 loop is stable.
+
+Exit criteria:
+
+- A stranger can clone the repo and render a mock image in under one minute.
+- A stranger with local model hardware can render through Diffusers without an API key.
+- The README clearly explains when Visura is better than a prompt pasted into an image UI.
+
+---
+
+## Deferred
 
 | Version | Features |
 |---|---|
-| v0.5 | `extends`/inheritance, watch mode, diff renderer, 3rd–5th kinds |
-| v1 | Eval suite (promptfoo-style), post-render critic loop, semantic linter |
-| v1.5 | Few-shot bootstrap cache, optimizer (GEPA-style), authoring assistant |
+| v0.5 | `extends`, watch mode, visual diff summaries, reference image polish |
+| v1 | Prompt linter, eval suite, post-render critic loop |
+| v1.5 | Prompt optimization, few-shot cache, authoring assistant |
 | v2 | External backend plugins, kind plugin installs, web UI |
 
 ---
 
-## First three files to write (literal order)
+## Success Criteria
 
-1. `examples/my-headshot.visura.toml` — write the TOML you *wish* existed. Let the desired authoring surface drive the schema, not the other way around.
-2. `src/visura/spec.py` — pydantic models that validate the example you just wrote, including the minimal provider/model render controls.
-3. `src/visura/kinds/headshot.py` — the compiler. Start ugly, get it end-to-end, then tighten.
+- A developer can use Visura without any paid API key.
+- `mock` backend is fast and deterministic enough for CI.
+- Local Diffusers renders are documented and usable.
+- Rendering unchanged specs is a cache hit.
+- Sidecars make generated assets auditable.
+- Specs live naturally beside real repo assets.
+- The README pitch is about asset generation workflows, not just TOML prompts.
