@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from visura.backends.base import BackendCapabilities, ImageBackend
 from visura.backends.bfl import BFLBackend
+from visura.backends.mock import MockBackend
 from visura.backends.openai import OpenAIBackend
 
 _REGISTRY: dict[str, ImageBackend] = {
     BFLBackend.name: BFLBackend(),
+    MockBackend.name: MockBackend(),
     OpenAIBackend.name: OpenAIBackend(),
 }
 

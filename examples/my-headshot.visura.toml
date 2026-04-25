@@ -5,6 +5,10 @@ size = "1024x1024"
 quality = "high"
 output_format = "png"
 
+[output]
+path = "assets/examples/my-headshot.png"
+alt = "Editorial studio headshot of Sabhya with warm polished lighting."
+
 [style]
 medium = "editorial studio portrait"
 mood = "confident, warm, polished"

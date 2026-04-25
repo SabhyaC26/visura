@@ -33,6 +33,31 @@ class Reference(BaseModel):
         return value
 
 
+class Output(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: Path
+    alt: str
+    name: str | None = None
+
+    @field_validator("path")
+    @classmethod
+    def path_must_be_repo_relative(cls, value: Path) -> Path:
+        if not str(value).strip():
+            raise ValueError("path must not be blank")
+        if value.is_absolute():
+            raise ValueError("path must be relative")
+        return value
+
+    @field_validator("alt")
+    @classmethod
+    def alt_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("alt must not be blank")
+        return value
+
+
 class Spec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -44,6 +69,7 @@ class Spec(BaseModel):
     quality: str | None = None
     output_format: OutputFormat = "png"
     background: str | None = None
+    output: Output
     style: Style = Field(default_factory=Style)
     references: list[Reference] = Field(default_factory=list)
     content: dict[str, Any]

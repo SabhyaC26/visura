@@ -6,6 +6,10 @@ quality = "high"
 output_format = "png"
 background = "opaque"
 
+[output]
+path = "assets/examples/blueprint-desk-lamp.png"
+alt = "Technical blueprint illustration of an adjustable architect desk lamp."
+
 [style]
 medium = "technical blueprint"
 mood = "precise, calm, engineered"

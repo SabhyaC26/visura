@@ -1,9 +1,13 @@
 kind = "poster"
-provider = "openai"
-model = "gpt-image-1"
+provider = "mock"
+model = "placeholder"
 size = "1024x1536"
-quality = "medium"
+quality = "draft"
 output_format = "png"
+
+[output]
+path = "assets/examples/workshop-poster.png"
+alt = "Risograph-style workshop poster for Prompt Craft Night."
 
 [style]
 medium = "risograph event poster"

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
+from visura.kinds.base import PromptPayload
 from visura.spec import Spec
 
 
@@ -20,3 +22,6 @@ class ImageBackend(Protocol):
 
     def validate_options(self, spec: Spec) -> None:
         """Raise ValueError when the spec uses unsupported backend options."""
+
+    def render(self, spec: Spec, payload: PromptPayload, output_path: Path) -> None:
+        """Render the compiled payload to output_path."""

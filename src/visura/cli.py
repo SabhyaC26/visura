@@ -6,6 +6,8 @@ from pathlib import Path
 import typer
 
 from visura import __version__
+from visura.backends import get_backend
+from visura.compiler import CompileError, compile_spec
 from visura.loader import SpecLoadError, load_spec
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
@@ -40,3 +42,43 @@ def validate(path: Path) -> None:
         raise typer.Exit(1) from exc
 
     typer.echo(json.dumps(spec.model_dump(mode="json"), indent=2, sort_keys=True))
+
+
+@app.command()
+def compile(path: Path) -> None:
+    """Compile a spec into an inspectable prompt payload."""
+    try:
+        spec = load_spec(path)
+        payload = compile_spec(spec)
+    except (SpecLoadError, CompileError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    typer.echo(json.dumps(payload.model_dump(mode="json"), indent=2, sort_keys=True))
+
+
+@app.command()
+def render(path: Path) -> None:
+    """Render a spec with a supported local backend."""
+    try:
+        spec = load_spec(path)
+        payload = compile_spec(spec)
+        backend = get_backend(spec.provider)
+    except (SpecLoadError, CompileError, KeyError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+    if spec.provider != "mock":
+        typer.echo("Rendering is currently implemented only for provider: mock", err=True)
+        raise typer.Exit(1)
+
+    output_path = Path(spec.output.path)
+    backend.render(spec, payload, output_path)
+    result = {
+        "spec_path": str(path),
+        "output_path": str(output_path),
+        "provider": spec.provider,
+        "model": spec.model,
+        "kind": spec.kind,
+    }
+    typer.echo(json.dumps(result, indent=2, sort_keys=True))

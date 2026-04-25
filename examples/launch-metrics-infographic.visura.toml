@@ -6,6 +6,10 @@ quality = "high"
 output_format = "png"
 background = "opaque"
 
+[output]
+path = "assets/examples/launch-metrics-infographic.png"
+alt = "Vertical infographic showing launch week signups, activation, renders, and cache rate."
+
 [style]
 medium = "editorial business infographic"
 mood = "clear, energetic, credible"

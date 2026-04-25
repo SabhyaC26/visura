@@ -5,6 +5,10 @@ size = "1024x1024"
 seed = 1234
 output_format = "png"
 
+[output]
+path = "assets/examples/bfl-klein-desk-lamp.png"
+alt = "Product mockup of a compact brushed aluminum desk lamp on a walnut desk."
+
 [style]
 medium = "clean product photography"
 mood = "warm, precise, minimal"

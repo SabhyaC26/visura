@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
 
-KindCompiler = Callable[[Any, dict[str, Any]], Any]
+from visura.spec import Spec
+
+from .base import PromptPayload
+
+KindCompiler = Callable[[Spec], PromptPayload]
 
 _REGISTRY: dict[str, KindCompiler] = {}
 
@@ -27,3 +30,6 @@ def get(name: str) -> KindCompiler:
 
 def registered_kinds() -> tuple[str, ...]:
     return tuple(sorted(_REGISTRY))
+
+
+from visura.kinds import builtin as _builtin  # noqa: E402, F401

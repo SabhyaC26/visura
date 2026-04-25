@@ -6,9 +6,10 @@ write a small `.visura.toml` file that captures the image intent, model options,
 style guidance, references, and structured content in a format that can be
 validated, versioned, reviewed, and eventually rendered.
 
-The current v0 surface is intentionally small: Visura validates specs and prints
-the resolved JSON representation. Rendering, prompt compilation, sidecar
-metadata, and artifact caching are planned next.
+The current v0 surface is intentionally small: Visura validates specs, compiles
+them into inspectable prompt payloads, and can render deterministic local mock
+images. Paid provider rendering, sidecar metadata, and artifact caching are
+planned next.
 
 ## Why Visura?
 
@@ -30,17 +31,17 @@ Implemented today:
 - `.visura.toml` loading via Python's `tomllib`
 - Pydantic validation for the v0 spec envelope
 - `visura validate <path>` CLI command
+- `visura compile <path>` CLI command
+- `visura render <path>` for deterministic local `mock` renders
 - Example specs for headshots, product mockups, posters, blueprints, and
   infographics
 - OpenAI and Black Forest Labs backend capability scaffolds
 
 Not implemented yet:
 
-- `visura render`
-- `visura compile`
-- Provider API calls
+- Provider API calls for rendering
 - Cache restoration and render sidecar metadata
-- Kind-specific compilers
+- Diffusers/local model rendering
 
 ## Requirements
 
@@ -90,6 +91,18 @@ Validate one spec:
 uv run visura validate examples/my-headshot.visura.toml
 ```
 
+Compile one spec into the payload a backend would receive:
+
+```bash
+uv run visura compile examples/workshop-poster.visura.toml
+```
+
+Render a deterministic local placeholder image with the `mock` provider:
+
+```bash
+uv run visura render examples/workshop-poster.visura.toml
+```
+
 Validate every checked-in example:
 
 ```bash
@@ -113,6 +126,11 @@ The validate command prints the resolved spec as formatted JSON. For example:
   },
   "kind": "headshot",
   "model": "gpt-image-1",
+  "output": {
+    "alt": "Editorial studio headshot of Sabhya with warm polished lighting.",
+    "name": null,
+    "path": "assets/examples/my-headshot.png"
+  },
   "output_format": "png",
   "provider": "openai",
   "quality": "high",
@@ -145,6 +163,10 @@ size = "1024x1024"
 quality = "high"
 output_format = "png"
 
+[output]
+path = "assets/examples/my-headshot.png"
+alt = "Editorial studio headshot of Sabhya with warm polished lighting."
+
 [style]
 medium = "editorial studio portrait"
 mood = "confident, warm, polished"
@@ -164,21 +186,23 @@ Supported top-level fields:
   `infographic`.
 - `model` - required string. The provider model name.
 - `provider` - optional string, defaults to `openai`. Registered providers are
-  `openai` and `bfl`.
+  `mock`, `openai`, and `bfl`.
 - `size` - optional string, defaults to `1024x1024`.
 - `seed` - optional integer.
 - `quality` - optional string.
 - `output_format` - optional string, one of `png`, `jpeg`, or `webp`; defaults
   to `png`.
 - `background` - optional string.
+- `[output]` - required output metadata with repo-relative `path`, `alt`, and
+  optional `name`.
 - `[style]` - optional style guidance with `medium`, `mood`, `palette`, and
   `notes`.
 - `[[references]]` - optional reference images with `path`, `role`, and
   `prompt`.
 - `[content]` - required table containing kind-specific image content.
 
-Unknown top-level fields and unknown fields inside `style` or `references` are
-rejected so typos fail fast.
+Unknown top-level fields and unknown fields inside `output`, `style`, or
+`references` are rejected so typos fail fast.
 
 ### Black Forest Labs
 
@@ -194,6 +218,10 @@ size = "1024x1024"
 seed = 1234
 output_format = "png"
 
+[output]
+path = "assets/examples/bfl-klein-desk-lamp.png"
+alt = "Product mockup of a compact brushed aluminum desk lamp on a walnut desk."
+
 [content]
 product = "a compact desk lamp with brushed aluminum joints"
 scene = "on a walnut desk beside a notebook and matte black pen"
@@ -203,6 +231,35 @@ lighting = "soft afternoon window light"
 BFL text-to-image sizes must be `WIDTHxHEIGHT`, use dimensions that are
 multiples of 16, and stay within the documented 64x64 minimum and 4 megapixel
 maximum. BFL currently accepts `png` and `jpeg` output formats in Visura.
+
+### Mock Rendering
+
+Use `provider = "mock"` for local development, tests, and CI. Mock rendering is
+deterministic and does not use the network:
+
+```toml
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "1024x1536"
+quality = "draft"
+output_format = "png"
+
+[output]
+path = "assets/examples/workshop-poster.png"
+alt = "Risograph-style workshop poster for Prompt Craft Night."
+
+[content]
+headline = "Make Images That Listen"
+details = "Friday, 7 PM, Studio 12"
+visual = "overhead view of hands arranging paper prompt cards around a glowing monitor"
+```
+
+Run it:
+
+```bash
+uv run visura render examples/workshop-poster.visura.toml
+```
 
 ## Examples
 
@@ -215,6 +272,10 @@ model = "gpt-image-1"
 size = "1024x1024"
 quality = "high"
 output_format = "png"
+
+[output]
+path = "assets/examples/coffee-packaging-mockup.png"
+alt = "Premium product mockup of a Northstar coffee pouch on a stone counter."
 
 [style]
 medium = "premium product photography"
@@ -244,6 +305,10 @@ size = "1024x1536"
 quality = "high"
 output_format = "png"
 background = "opaque"
+
+[output]
+path = "assets/examples/launch-metrics-infographic.png"
+alt = "Vertical infographic showing launch week signups, activation, renders, and cache rate."
 
 [style]
 medium = "editorial business infographic"

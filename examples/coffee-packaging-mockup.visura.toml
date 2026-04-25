@@ -5,6 +5,10 @@ size = "1024x1024"
 quality = "high"
 output_format = "png"
 
+[output]
+path = "assets/examples/coffee-packaging-mockup.png"
+alt = "Premium product mockup of a Northstar coffee pouch on a stone counter."
+
 [style]
 medium = "premium product photography"
 mood = "bright, tactile, modern"
