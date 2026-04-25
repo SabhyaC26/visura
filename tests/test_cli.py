@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -132,6 +133,7 @@ headline = "Make Images That Listen"
         assert result.exit_code == 0
         assert Path("assets/poster.png").exists()
         assert '"output_path": "assets/poster.png"' in result.stdout
+        assert Path("assets/poster.visura.json").exists()
 
 
 def test_render_paid_provider_requires_yes(tmp_path: Path) -> None:
@@ -158,6 +160,116 @@ product = "desk lamp"
 
     assert result.exit_code == 1
     assert "requires --yes" in result.stderr
+
+
+def test_render_mock_writes_sidecar_and_cache_metadata(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        spec_path.write_text(
+            """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+            encoding="utf-8",
+        )
+
+        result = CliRunner().invoke(app, ["render", str(spec_path)])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        sidecar = json.loads(Path("assets/poster.visura.json").read_text(encoding="utf-8"))
+
+        assert payload["cache"] == "miss"
+        assert payload["sidecar_path"] == "assets/poster.visura.json"
+        assert payload["render_hash"].startswith("sha256:")
+        assert payload["output_digest"].startswith("sha256:")
+        assert sidecar["schema_version"] == "0.1"
+        assert sidecar["cache"] == "miss"
+        assert sidecar["spec"]["output"]["path"] == "assets/poster.png"
+        assert sidecar["payload"]["prompt"]
+        assert Path(".visura/cache").exists()
+
+
+def test_render_mock_restores_deleted_output_from_cache(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        spec_path.write_text(
+            """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+            encoding="utf-8",
+        )
+
+        first = CliRunner().invoke(app, ["render", str(spec_path)])
+        Path("assets/poster.png").unlink()
+        second = CliRunner().invoke(app, ["render", str(spec_path)])
+
+        first_payload = json.loads(first.stdout)
+        second_payload = json.loads(second.stdout)
+        sidecar = json.loads(Path("assets/poster.visura.json").read_text(encoding="utf-8"))
+
+        assert first.exit_code == 0
+        assert second.exit_code == 0
+        assert Path("assets/poster.png").exists()
+        assert second_payload["cache"] == "hit"
+        assert second_payload["render_hash"] == first_payload["render_hash"]
+        assert second_payload["output_digest"] == first_payload["output_digest"]
+        assert sidecar["cache"] == "hit"
+
+
+def test_render_mock_force_refreshes_cache(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        spec_path.write_text(
+            """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+            encoding="utf-8",
+        )
+
+        first = CliRunner().invoke(app, ["render", str(spec_path)])
+        forced = CliRunner().invoke(app, ["render", str(spec_path), "--force"])
+
+        first_payload = json.loads(first.stdout)
+        forced_payload = json.loads(forced.stdout)
+
+        assert first.exit_code == 0
+        assert forced.exit_code == 0
+        assert forced_payload["cache"] == "refresh"
+        assert forced_payload["render_hash"] == first_payload["render_hash"]
+        assert forced_payload["output_digest"] == first_payload["output_digest"]
 
 
 def test_render_bfl_requires_api_key_with_yes(tmp_path: Path, monkeypatch) -> None:

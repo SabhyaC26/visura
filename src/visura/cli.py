@@ -10,6 +10,7 @@ from visura.backends import get_backend
 from visura.backends.bfl import BFLRenderError
 from visura.compiler import CompileError, compile_spec
 from visura.loader import SpecLoadError, load_spec
+from visura.render import render_with_cache
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -66,6 +67,11 @@ def render(
         "--yes",
         help="Allow rendering with paid or networked providers.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Bypass the render cache and refresh the cached artifact.",
+    ),
 ) -> None:
     """Render a spec with a supported local backend."""
     try:
@@ -85,16 +91,16 @@ def render(
 
     output_path = Path(spec.output.path)
     try:
-        backend.render(spec, payload, output_path)
+        result = render_with_cache(
+            spec_path=path,
+            spec=spec,
+            payload=payload,
+            backend=backend,
+            output_path=output_path,
+            force=force,
+        )
     except (BFLRenderError, ValueError, OSError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
 
-    result = {
-        "spec_path": str(path),
-        "output_path": str(output_path),
-        "provider": spec.provider,
-        "model": spec.model,
-        "kind": spec.kind,
-    }
-    typer.echo(json.dumps(result, indent=2, sort_keys=True))
+    typer.echo(json.dumps(result.model_dump(mode="json"), indent=2, sort_keys=True))

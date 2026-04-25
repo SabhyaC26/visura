@@ -8,8 +8,8 @@ validated, versioned, reviewed, and eventually rendered.
 
 The current v0 surface is intentionally small: Visura validates specs, compiles
 them into inspectable prompt payloads, and can render deterministic local mock
-images. Paid provider rendering, sidecar metadata, and artifact caching are
-planned next.
+images with cache restoration and sidecar metadata. Paid provider rendering and
+local Diffusers rendering are planned next.
 
 ## Why Visura?
 
@@ -33,6 +33,8 @@ Implemented today:
 - `visura validate <path>` CLI command
 - `visura compile <path>` CLI command
 - `visura render <path>` for deterministic local `mock` renders
+- Content-addressed render cache under `.visura/cache`
+- Render sidecars next to outputs, such as `assets/poster.visura.json`
 - Example specs for headshots, product mockups, posters, blueprints, and
   infographics
 - OpenAI and Black Forest Labs backend capability scaffolds
@@ -40,7 +42,6 @@ Implemented today:
 Not implemented yet:
 
 - OpenAI API calls for rendering
-- Cache restoration and render sidecar metadata
 - Diffusers/local model rendering
 
 ## Requirements
@@ -102,6 +103,10 @@ Render a deterministic local placeholder image with the `mock` provider:
 ```bash
 uv run visura render examples/workshop-poster.visura.toml
 ```
+
+The render command writes the requested output, writes a sidecar next to it, and
+stores the artifact in `.visura/cache`. Rendering the same unchanged spec again
+restores from cache; use `--force` to refresh the cached artifact.
 
 Validate every checked-in example:
 

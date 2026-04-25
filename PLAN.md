@@ -313,6 +313,8 @@ Exit criteria:
 
 ### M4 — Cache And Sidecars
 
+Current status: implemented.
+
 Make the workflow affordable and traceable.
 
 Scope:
