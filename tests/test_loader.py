@@ -178,7 +178,9 @@ kind = "headshot
 
 def test_builtin_kinds_are_registered() -> None:
     assert registered_kinds() == (
+        "anime_character",
         "blueprint",
+        "comic_panel",
         "headshot",
         "infographic",
         "poster",

@@ -29,10 +29,15 @@ def _format_value(value: Any) -> str:
     return str(value)
 
 
+def _article_for(phrase: str) -> str:
+    return "an" if phrase[:1].lower() in {"a", "e", "i", "o", "u"} else "a"
+
+
 def _prompt_for(spec: Spec, *, required: Iterable[str]) -> PromptPayload:
     _require_content(spec, required)
 
-    parts = [f"Create a {spec.kind.replace('_', ' ')} image."]
+    kind_label = spec.kind.replace("_", " ")
+    parts = [f"Create {_article_for(kind_label)} {kind_label} image."]
     if spec.style.medium:
         parts.append(f"Medium: {spec.style.medium}.")
     if spec.style.mood:
@@ -44,7 +49,7 @@ def _prompt_for(spec: Spec, *, required: Iterable[str]) -> PromptPayload:
     if spec.background:
         parts.append(f"Background: {spec.background}.")
 
-    for key in sorted(spec.content):
+    for key in spec.content:
         parts.append(f"{key.replace('_', ' ').title()}: {_format_value(spec.content[key])}.")
 
     options: dict[str, Any] = {
@@ -85,9 +90,19 @@ def compile_blueprint(spec: Spec) -> PromptPayload:
     return _prompt_for(spec, required=("object",))
 
 
+@register("comic_panel")
+def compile_comic_panel(spec: Spec) -> PromptPayload:
+    return _prompt_for(spec, required=("scene",))
+
+
 @register("headshot")
 def compile_headshot(spec: Spec) -> PromptPayload:
     return _prompt_for(spec, required=("subject",))
+
+
+@register("anime_character")
+def compile_anime_character(spec: Spec) -> PromptPayload:
+    return _prompt_for(spec, required=("character",))
 
 
 @register("infographic")

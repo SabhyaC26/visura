@@ -30,6 +30,34 @@ def test_compile_example() -> None:
     assert '"path": "assets/examples/workshop-poster.png"' in result.stdout
 
 
+def test_compile_preserves_content_order_and_article(tmp_path: Path) -> None:
+    spec_path = tmp_path / "anime.visura.toml"
+    spec_path.write_text(
+        """
+kind = "anime_character"
+provider = "mock"
+model = "placeholder"
+
+[output]
+path = "assets/anime.png"
+alt = "Anime character."
+
+[content]
+character = "inventor"
+pose = "holding a tablet"
+setting = "workshop"
+""",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["compile", str(spec_path)])
+
+    assert result.exit_code == 0
+    assert "Create an anime character image." in result.stdout
+    assert result.stdout.index("Character: inventor.") < result.stdout.index("Pose: holding")
+    assert result.stdout.index("Pose: holding") < result.stdout.index("Setting: workshop.")
+
+
 def test_compile_unknown_kind(tmp_path: Path) -> None:
     spec_path = tmp_path / "unknown.visura.toml"
     spec_path.write_text(

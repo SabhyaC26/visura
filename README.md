@@ -204,6 +204,9 @@ Supported top-level fields:
 Unknown top-level fields and unknown fields inside `output`, `style`, or
 `references` are rejected so typos fail fast.
 
+Built-in compilers currently support `anime_character`, `blueprint`,
+`comic_panel`, `headshot`, `infographic`, `poster`, and `product_mockup`.
+
 ### Black Forest Labs
 
 Use `provider = "bfl"` for Black Forest Labs FLUX models. Model names map to BFL
