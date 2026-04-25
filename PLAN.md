@@ -8,6 +8,8 @@ The core promise:
 
 > Keep generated image assets in your repo as source-controlled specs. Render cheaply with mock or local open models, use paid APIs only when final quality is worth the cost, and always know what produced each artifact.
 
+The CLI and TOML spec are the stable engine. A Visura skill should sit on top as the agent-native UX layer: it teaches coding agents how to author specs, run the CLI safely, inspect JSON output, and avoid paid backends unless explicitly requested.
+
 ---
 
 ## Why Developers Would Care
@@ -51,6 +53,15 @@ visura render assets/ --dry-run --json
 
 Coding agents should be able to use Visura without scraping prose logs, guessing output paths, or accidentally triggering paid API calls.
 
+The optional Visura skill should not replace the CLI. It should wrap it:
+
+- Author or edit `.visura.toml` specs from natural language requests.
+- Default to `provider = "mock"` for development.
+- Run `visura validate --json`, `visura compile --json`, `visura render --json`, and `visura status --json`.
+- Interpret JSON results for the user.
+- Ask before switching to paid backends.
+- Leave durable specs, outputs, sidecars, and cache entries in the repo.
+
 Typical spec:
 
 ```toml
@@ -93,6 +104,7 @@ Backends:
 - Provenance by default: every output should have a sidecar.
 - Asset-oriented: specs should know where outputs live in a real repo.
 - Agent-friendly: every command should have stable machine-readable output and predictable side effects.
+- Skill-compatible: a Visura skill should improve agent UX while delegating durable work to the CLI.
 - Provider-neutral, not provider-blind: backends can expose different capabilities, but the user should get clear validation errors.
 
 ---
@@ -119,6 +131,7 @@ v0 should deliver the smallest complete workflow a developer can actually use:
 - `visura render`
 - `visura status`
 - JSON output modes for agent callers
+- optional Visura skill workflow
 - `mock` backend
 - first local `diffusers` backend path
 - output path support
@@ -184,6 +197,32 @@ Example render result:
   ]
 }
 ```
+
+## Skill Layer
+
+Visura should ship or document an optional skill for agent environments, but the skill should be a thin workflow layer rather than the source of truth.
+
+The skill is responsible for:
+
+- Translating a user's request into a good `.visura.toml` spec.
+- Choosing a reasonable `kind`, `size`, `output.path`, `style`, and `content` shape.
+- Running safe CLI commands in the right order.
+- Reading JSON output and explaining only the relevant result.
+- Using `mock` or local backends by default.
+- Asking before paid renders or destructive overwrites.
+- Updating README/docs references when generated assets are meant to be used by the project.
+
+The skill is not responsible for:
+
+- Owning the spec schema.
+- Hiding generated asset state in an agent transcript.
+- Replacing cache, sidecars, or status checks.
+- Creating a workflow that only works in one agent product.
+
+The product boundary should stay clear:
+
+- CLI/TOML/cache/sidecar: durable repo-native engine.
+- Skill: agent-native authoring and orchestration layer.
 
 ---
 
@@ -349,7 +388,29 @@ Exit criteria:
 
 ---
 
-### M7 — Local Diffusers Backend
+### M7 — Visura Skill
+
+Make the agent workflow easy without making it agent-only.
+
+Scope:
+
+- Draft a Visura skill that teaches agents the recommended workflow.
+- Default the skill to mock renders and JSON CLI calls.
+- Include guidance for authoring useful specs from natural language.
+- Include guardrails for paid providers and overwrites.
+- Document how the skill should handle `validate`, `compile`, `render`, and `status`.
+- Keep the skill thin: it should call Visura rather than reimplementing Visura behavior.
+
+Exit criteria:
+
+- An agent can turn "make an OG image for this page" into a checked-in `.visura.toml` plus mock output.
+- The skill uses `visura status --json` and `visura render --json` instead of parsing human logs.
+- The skill asks before paid provider usage.
+- The same repo workflow still works without the skill.
+
+---
+
+### M8 — Local Diffusers Backend
 
 Add a real local image backend for cheap iteration.
 
@@ -369,7 +430,7 @@ Exit criteria:
 
 ---
 
-### M8 — Paid Backend Polish
+### M9 — Paid Backend Polish
 
 Make OpenAI useful after the local loop already works.
 
@@ -389,13 +450,14 @@ Exit criteria:
 
 ---
 
-### M9 — Docs And Distribution
+### M10 — Docs And Distribution
 
 Make the project understandable to a stranger.
 
 Scope:
 
 - README quickstart with mock render first.
+- Agent/skill workflow guide.
 - Local Diffusers guide.
 - Paid backend guide.
 - Asset workflow examples for docs images, product mockups, posters, OG images, and demo data.
@@ -405,6 +467,7 @@ Scope:
 Exit criteria:
 
 - A stranger can clone the repo and render a mock image in under one minute.
+- An agent can follow the documented skill workflow without special project knowledge.
 - A stranger with local model hardware can render through Diffusers without an API key.
 - The README clearly explains when Visura is better than a prompt pasted into an image UI.
 
@@ -417,7 +480,7 @@ Exit criteria:
 | v0.5 | `extends`, watch mode, visual diff summaries, reference image polish |
 | v1 | Prompt linter, eval suite, post-render critic loop |
 | v1.5 | Prompt optimization, few-shot cache, authoring assistant |
-| v2 | External backend plugins, kind plugin installs, web UI |
+| v2 | External backend plugins, kind plugin installs, web UI, MCP server |
 
 ---
 
@@ -425,6 +488,7 @@ Exit criteria:
 
 - A developer can use Visura without any paid API key.
 - Coding agents can use Visura through stable JSON output and non-interactive flags.
+- A Visura skill can orchestrate the CLI without becoming the source of truth.
 - `mock` backend is fast and deterministic enough for CI.
 - Local Diffusers renders are documented and usable.
 - Rendering unchanged specs is a cache hit.

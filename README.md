@@ -1,5 +1,9 @@
 # Visura
 
+<p align="center">
+  <img src="assets/visura-icon.png" alt="Visura icon" width="160">
+</p>
+
 Visura is a Python library and CLI for declarative, replayable image generation
 specs. Instead of keeping one-off prose prompts in notes or chat history, you
 write a small `.visura.toml` file that captures the image intent, model options,
