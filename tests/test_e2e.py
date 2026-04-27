@@ -232,3 +232,43 @@ product = "desk lamp"
     assert result.returncode == 1
     assert "requires --yes" in result.stderr
     assert not (tmp_path / "assets" / "paid.png").exists()
+
+
+def test_e2e_status_discovers_specs_and_reports_asset_state(tmp_path: Path) -> None:
+    spec_path = write_poster_spec(tmp_path)
+    missing_spec_path = tmp_path / "assets" / "missing-output.visura.toml"
+    missing_spec_path.write_text(
+        """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/missing-output.png"
+alt = "Missing output poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+        encoding="utf-8",
+    )
+
+    render = run_visura(tmp_path, "render", str(spec_path))
+    status = run_visura(tmp_path, "status", "assets")
+
+    assert render.returncode == 0
+    assert status.returncode == 1
+    payload = json.loads(status.stdout)
+    by_path = {item["spec_path"]: item for item in payload}
+
+    rendered = by_path[str(spec_path.relative_to(tmp_path))]
+    missing = by_path[str(missing_spec_path.relative_to(tmp_path))]
+
+    assert rendered["state"] == "clean"
+    assert rendered["ok"] is True
+    assert rendered["cache_exists"] is True
+    assert missing["state"] == "missing_output"
+    assert missing["ok"] is False
+    assert missing["sidecar_exists"] is False

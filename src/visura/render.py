@@ -65,7 +65,7 @@ def render_with_cache(
     output_path: Path,
     force: bool = False,
 ) -> RenderResult:
-    reference_digests = _reference_digests(spec)
+    reference_digests = reference_digests_for(spec)
     render_hash = compute_render_hash(
         spec=spec,
         payload=payload,
@@ -161,7 +161,7 @@ def write_sidecar(path: Path, record: RenderRecord) -> None:
     )
 
 
-def _reference_digests(spec: Spec) -> list[ReferenceDigest]:
+def reference_digests_for(spec: Spec) -> list[ReferenceDigest]:
     digests: list[ReferenceDigest] = []
     for reference in spec.references:
         path = reference.path

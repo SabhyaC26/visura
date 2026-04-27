@@ -297,3 +297,138 @@ product = "desk lamp"
 
     assert result.exit_code == 1
     assert "BFL_API_KEY is required" in result.stderr
+
+
+def test_status_reports_clean_rendered_asset(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        spec_path.write_text(
+            """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+            encoding="utf-8",
+        )
+
+        render = CliRunner().invoke(app, ["render", str(spec_path)])
+        result = CliRunner().invoke(app, ["status", str(spec_path)])
+
+        assert render.exit_code == 0
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload[0]["ok"] is True
+        assert payload[0]["state"] == "clean"
+        assert payload[0]["output_exists"] is True
+        assert payload[0]["sidecar_exists"] is True
+        assert payload[0]["cache_exists"] is True
+        assert payload[0]["current_render_hash"] == payload[0]["sidecar_render_hash"]
+
+
+def test_status_reports_stale_after_spec_change(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        spec_path.write_text(
+            """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+            encoding="utf-8",
+        )
+        render = CliRunner().invoke(app, ["render", str(spec_path)])
+
+        spec_path.write_text(
+            spec_path.read_text(encoding="utf-8").replace(
+                'headline = "Make Images That Listen"',
+                'headline = "Make Images That Remember"',
+            ),
+            encoding="utf-8",
+        )
+        result = CliRunner().invoke(app, ["status", str(spec_path)])
+
+        assert render.exit_code == 0
+        assert result.exit_code == 1
+        payload = json.loads(result.stdout)
+        assert payload[0]["ok"] is False
+        assert payload[0]["state"] == "stale"
+        assert payload[0]["current_render_hash"] != payload[0]["sidecar_render_hash"]
+
+
+def test_status_reports_missing_sidecar(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        spec_path.write_text(
+            """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+headline = "Make Images That Listen"
+""",
+            encoding="utf-8",
+        )
+        render = CliRunner().invoke(app, ["render", str(spec_path)])
+        Path("assets/poster.visura.json").unlink()
+
+        result = CliRunner().invoke(app, ["status", str(spec_path)])
+
+        assert render.exit_code == 0
+        assert result.exit_code == 1
+        payload = json.loads(result.stdout)
+        assert payload[0]["ok"] is False
+        assert payload[0]["state"] == "missing_sidecar"
+        assert payload[0]["output_exists"] is True
+        assert payload[0]["sidecar_exists"] is False
+
+
+def test_status_reports_invalid_spec(tmp_path: Path) -> None:
+    spec_path = tmp_path / "poster.visura.toml"
+    spec_path.write_text(
+        """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+event = "No headline"
+""",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["status", str(spec_path)])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert payload[0]["ok"] is False
+    assert payload[0]["state"] == "invalid"
+    assert "poster content is missing required field(s): headline" in payload[0]["error"]

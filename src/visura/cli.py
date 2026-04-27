@@ -11,8 +11,13 @@ from visura.backends.bfl import BFLRenderError
 from visura.compiler import CompileError, compile_spec
 from visura.loader import SpecLoadError, load_spec
 from visura.render import render_with_cache
+from visura.status import collect_spec_paths, status_for_path
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
+STATUS_PATHS_ARGUMENT = typer.Argument(
+    None,
+    help="Spec files or directories to inspect. Defaults to the current directory.",
+)
 
 
 def _version_callback(value: bool) -> None:
@@ -104,3 +109,20 @@ def render(
         raise typer.Exit(1) from exc
 
     typer.echo(json.dumps(result.model_dump(mode="json"), indent=2, sort_keys=True))
+
+
+@app.command()
+def status(
+    paths: list[Path] | None = STATUS_PATHS_ARGUMENT,
+) -> None:
+    """Inspect specs, outputs, sidecars, and render cache state."""
+    results = [status_for_path(path) for path in collect_spec_paths(paths)]
+    typer.echo(
+        json.dumps(
+            [result.model_dump(mode="json") for result in results],
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    if any(not result.ok for result in results):
+        raise typer.Exit(1)

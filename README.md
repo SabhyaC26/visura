@@ -33,6 +33,7 @@ Implemented today:
 - `visura validate <path>` CLI command
 - `visura compile <path>` CLI command
 - `visura render <path>` for deterministic local `mock` renders
+- `visura status [path ...]` for inspecting specs, outputs, sidecars, and cache state
 - Content-addressed render cache under `.visura/cache`
 - Render sidecars next to outputs, such as `assets/poster.visura.json`
 - Example specs for headshots, product mockups, posters, blueprints, and
@@ -107,6 +108,17 @@ uv run visura render examples/workshop-poster.visura.toml
 The render command writes the requested output, writes a sidecar next to it, and
 stores the artifact in `.visura/cache`. Rendering the same unchanged spec again
 restores from cache; use `--force` to refresh the cached artifact.
+
+Inspect specs and their generated artifacts:
+
+```bash
+uv run visura status examples/
+```
+
+The status command discovers `.visura.toml` files in directories and prints JSON
+records showing whether each asset is `clean`, `missing_output`,
+`missing_sidecar`, `stale`, `changed`, or `invalid`. It exits nonzero when any
+asset is not clean.
 
 Validate every checked-in example:
 
