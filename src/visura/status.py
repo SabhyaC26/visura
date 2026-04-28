@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import glob
 import json
 from pathlib import Path
 from typing import Literal
@@ -43,10 +44,11 @@ def collect_spec_paths(paths: list[Path] | None = None) -> list[Path]:
     candidates = paths or [Path.cwd()]
     spec_paths: list[Path] = []
     for candidate in candidates:
-        if candidate.is_dir():
-            spec_paths.extend(_discover_specs(candidate))
-        else:
-            spec_paths.append(candidate)
+        for expanded in _expand_candidate(candidate):
+            if expanded.is_dir():
+                spec_paths.extend(_discover_specs(expanded))
+            else:
+                spec_paths.append(expanded)
     return sorted(_dedupe(spec_paths), key=lambda path: str(path))
 
 
@@ -128,6 +130,17 @@ def _discover_specs(directory: Path) -> list[Path]:
         for path in directory.rglob("*.visura.toml")
         if not any(part in ignored_parts for part in path.parts)
     ]
+
+
+def _expand_candidate(candidate: Path) -> list[Path]:
+    text = str(candidate)
+    if not any(character in text for character in "*?["):
+        return [candidate]
+
+    matches = glob.glob(text, recursive=True)
+    if not matches:
+        return [candidate]
+    return [Path(match) for match in matches]
 
 
 def _dedupe(paths: list[Path]) -> list[Path]:

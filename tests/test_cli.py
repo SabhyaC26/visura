@@ -8,6 +8,34 @@ from typer.testing import CliRunner
 from visura.cli import app
 
 
+def write_poster_spec(
+    path: Path,
+    *,
+    output_path: str,
+    provider: str = "mock",
+    model: str = "placeholder",
+    headline: str = "Make Images That Listen",
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f"""
+kind = "poster"
+provider = "{provider}"
+model = "{model}"
+size = "512x512"
+output_format = "png"
+
+[output]
+path = "{output_path}"
+alt = "Poster."
+
+[content]
+headline = "{headline}"
+""",
+        encoding="utf-8",
+    )
+
+
 def test_validate_example() -> None:
     result = CliRunner().invoke(app, ["validate", "examples/my-headshot.visura.toml"])
 
@@ -29,6 +57,34 @@ def test_compile_example() -> None:
     assert '"kind": "poster"' in result.stdout
     assert '"prompt":' in result.stdout
     assert '"path": "assets/examples/workshop-poster.png"' in result.stdout
+
+
+def test_compile_provider_model_override_accepts_json_option(tmp_path: Path) -> None:
+    spec_path = tmp_path / "poster.visura.toml"
+    write_poster_spec(
+        spec_path,
+        output_path="assets/poster.png",
+        provider="openai",
+        model="gpt-image-1",
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "compile",
+            str(spec_path),
+            "--provider",
+            "mock",
+            "--model",
+            "placeholder",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["provider"] == "mock"
+    assert payload["model"] == "placeholder"
 
 
 def test_compile_preserves_content_order_and_article(tmp_path: Path) -> None:
@@ -160,6 +216,123 @@ product = "desk lamp"
 
     assert result.exit_code == 1
     assert "requires --yes" in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["provider"] == "bfl"
+    assert payload["model"] == "flux-2-klein-4b"
+    assert payload["cache"] is None
+
+
+def test_render_batch_directory_with_multiple_mock_specs(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        write_poster_spec(
+            Path("assets/one.visura.toml"),
+            output_path="assets/one.png",
+            headline="First Poster",
+        )
+        write_poster_spec(
+            Path("assets/two.visura.toml"),
+            output_path="assets/two.png",
+            headline="Second Poster",
+        )
+
+        result = CliRunner().invoke(app, ["render", "assets", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert [item["spec_path"] for item in payload] == [
+            "assets/one.visura.toml",
+            "assets/two.visura.toml",
+        ]
+        assert all(item["ok"] is True for item in payload)
+        assert all(item["provider"] == "mock" for item in payload)
+        assert all(item["model"] == "placeholder" for item in payload)
+        assert {item["cache"] for item in payload} == {"miss"}
+        assert Path("assets/one.png").exists()
+        assert Path("assets/two.png").exists()
+        assert Path("assets/one.visura.json").exists()
+        assert Path("assets/two.visura.json").exists()
+
+
+def test_render_expands_quoted_glob(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        write_poster_spec(
+            Path("assets/one.visura.toml"),
+            output_path="assets/one.png",
+            headline="First Poster",
+        )
+        write_poster_spec(
+            Path("assets/two.visura.toml"),
+            output_path="assets/two.png",
+            headline="Second Poster",
+        )
+
+        result = CliRunner().invoke(app, ["render", "assets/*.visura.toml", "--dry-run"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert [item["spec_path"] for item in payload] == [
+            "assets/one.visura.toml",
+            "assets/two.visura.toml",
+        ]
+        assert all(item["dry_run"] is True for item in payload)
+        assert not Path("assets/one.png").exists()
+        assert not Path("assets/two.png").exists()
+
+
+def test_render_dry_run_writes_nothing(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        write_poster_spec(Path("poster.visura.toml"), output_path="assets/poster.png")
+
+        result = CliRunner().invoke(app, ["render", "poster.visura.toml", "--dry-run"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        assert payload["ok"] is True
+        assert payload["dry_run"] is True
+        assert payload["cache"] == "miss"
+        assert payload["planned_action"] == "render"
+        assert payload["output_path"] == "assets/poster.png"
+        assert payload["sidecar_path"] == "assets/poster.visura.json"
+        assert payload["provider"] == "mock"
+        assert payload["model"] == "placeholder"
+        assert not Path("assets/poster.png").exists()
+        assert not Path("assets/poster.visura.json").exists()
+        assert not Path(".visura").exists()
+
+
+def test_render_provider_override_uses_mock_without_editing_spec(tmp_path: Path) -> None:
+    with CliRunner().isolated_filesystem(temp_dir=tmp_path):
+        spec_path = Path("poster.visura.toml")
+        write_poster_spec(
+            spec_path,
+            output_path="assets/poster.png",
+            provider="openai",
+            model="gpt-image-1",
+        )
+
+        result = CliRunner().invoke(
+            app,
+            [
+                "render",
+                str(spec_path),
+                "--provider",
+                "mock",
+                "--model",
+                "placeholder",
+            ],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.stdout)
+        sidecar = json.loads(Path("assets/poster.visura.json").read_text(encoding="utf-8"))
+        assert payload["ok"] is True
+        assert payload["provider"] == "mock"
+        assert payload["model"] == "placeholder"
+        assert sidecar["provider"] == "mock"
+        assert sidecar["model"] == "placeholder"
+        assert 'provider = "openai"' in spec_path.read_text(encoding="utf-8")
+        assert Path("assets/poster.png").exists()
 
 
 def test_render_mock_writes_sidecar_and_cache_metadata(tmp_path: Path) -> None:
