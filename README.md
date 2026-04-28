@@ -1,63 +1,55 @@
 # Visura
 
 Visura is a Python library and CLI for declarative, replayable image generation
-specs. Instead of keeping one-off prose prompts in notes or chat history, you
-write a small `.visura.toml` file that captures the image intent, model options,
-style guidance, references, and structured content in a format that can be
-validated, versioned, reviewed, and eventually rendered.
+specs. Instead of leaving prompts in notes, chat history, or one-off scripts,
+you write a `.visura.toml` file that captures the image intent, model options,
+style guidance, references, output path, and structured content.
 
-The current v0 surface is intentionally small: Visura validates specs, compiles
-them into inspectable prompt payloads, and can render deterministic local mock
-images with cache restoration and sidecar metadata. Paid provider rendering and
-local Diffusers rendering are planned next.
-
-## Why Visura?
-
-Image generation work often starts as a prompt, then quickly turns into a set of
-model choices, image dimensions, style constraints, reference images, and
-iteration notes. Visura makes that state explicit:
-
-- Specs are plain TOML, so they are easy to read and commit.
-- Validation catches unknown fields, missing fields, wrong types, and malformed
-  TOML before you spend time or API calls.
-- Provider and model controls live next to the content that depends on them.
-- The format is designed for replayability: future render output can be tied
-  back to the exact spec that produced it.
+The current product is local-first: validate and compile specs, render
+deterministic local mock images, cache unchanged outputs, write sidecar
+metadata, and inspect asset status. Black Forest Labs rendering has a networked
+provider path behind an API key and `--yes`. OpenAI is scaffold-only for the
+current milestone, and Diffusers has a first optional local rendering path.
 
 ## Project Status
 
 Implemented today:
 
-- `.visura.toml` loading via Python's `tomllib`
-- Pydantic validation for the v0 spec envelope
-- `visura validate <path>` CLI command
-- `visura compile <path>` CLI command
-- `visura render <path>` for deterministic local `mock` renders
-- `visura status [path ...]` for inspecting specs, outputs, sidecars, and cache state
-- Content-addressed render cache under `.visura/cache`
-- Render sidecars next to outputs, such as `assets/poster.visura.json`
-- Example specs for headshots, product mockups, posters, blueprints, and
-  infographics
-- OpenAI and Black Forest Labs backend capability scaffolds
+- `.visura.toml` loading and Pydantic validation.
+- `visura validate <path>` for resolved spec JSON.
+- `visura compile <path>` for inspectable prompt payload JSON.
+- `visura render <path>` for deterministic local `mock` renders.
+- Render cache under `.visura/cache`.
+- Sidecar metadata next to outputs, such as `assets/poster.visura.json`.
+- `visura status [path ...]` for `clean`, `missing_output`,
+  `missing_sidecar`, `stale`, `changed`, and `invalid` states.
+- A BFL rendering path for networked, key-gated FLUX renders.
+- A Diffusers rendering path for optional local model execution.
+- Built-in compilers for `anime_character`, `blueprint`, `comic_panel`,
+  `headshot`, `infographic`, `poster`, and `product_mockup`.
+
+Partially implemented:
+
+- CLI JSON output exists by default, and `--json` is accepted, but stable
+  versioned response wrappers are still planned.
+- `render` has `--dry-run`, `--force`, `--yes`, `--provider`, and `--model`;
+  `compile` has provider/model overrides. `--quiet` and a full cross-command
+  agent contract are still planned.
+- `render` accepts files, directories, and globs, but the next milestone should
+  harden batch behavior, response shape, and examples for agent use.
 
 Not implemented yet:
 
-- OpenAI API calls for rendering
-- Diffusers/local model rendering
+- Production OpenAI rendering.
+- Provider reference/image-editing workflows.
+- A packaged Visura skill for coding agents.
 
-## Requirements
+## Install
+
+Requirements:
 
 - Python 3.11+
 - `uv` for the recommended development workflow
-
-Runtime dependencies are declared in `pyproject.toml`:
-
-- `pydantic`
-- `typer`
-- `openai`
-- `pillow`
-
-## Install
 
 From a local checkout:
 
@@ -67,218 +59,47 @@ cd visura
 uv sync
 ```
 
-You can also install the package into another environment in editable mode:
+For local Diffusers rendering:
 
 ```bash
-python -m pip install -e .
+uv sync --extra diffusers
 ```
 
-## How To Run
+## Quickstart: Local Mock Render
 
-Show CLI help:
-
-```bash
-uv run visura --help
-```
-
-Show the installed package version:
+Use the mock provider first. It is deterministic, local, CI-friendly, and does
+not require API keys.
 
 ```bash
-uv run visura --version
-```
-
-Validate one spec:
-
-```bash
-uv run visura validate examples/my-headshot.visura.toml
-```
-
-Compile one spec into the payload a backend would receive:
-
-```bash
+uv run visura validate examples/workshop-poster.visura.toml
 uv run visura compile examples/workshop-poster.visura.toml
-```
-
-Render a deterministic local placeholder image with the `mock` provider:
-
-```bash
 uv run visura render examples/workshop-poster.visura.toml
+uv run visura status examples/workshop-poster.visura.toml
 ```
 
 The render command writes the requested output, writes a sidecar next to it, and
 stores the artifact in `.visura/cache`. Rendering the same unchanged spec again
-restores from cache; use `--force` to refresh the cached artifact.
+restores from cache. Use `--force` only when you want to refresh the artifact.
 
-Render through OpenAI by setting `OPENAI_API_KEY` and passing `--yes` to
-acknowledge that the command can spend credits:
-
-```bash
-OPENAI_API_KEY=... uv run visura render examples/my-headshot.visura.toml --yes
-```
-
-The OpenAI backend currently targets `model = "gpt-image-1"` with sizes
-`1024x1024`, `1536x1024`, `1024x1536`, or `auto`; qualities `low`, `medium`,
-`high`, or `auto`; and `png`, `jpeg`, or `webp` output. `seed` and reference
-images are rejected for OpenAI generation before any API call.
-
-Inspect specs and their generated artifacts:
+For a write-free preview:
 
 ```bash
-uv run visura status examples/
+uv run visura render examples/workshop-poster.visura.toml --dry-run --json
 ```
 
-The status command discovers `.visura.toml` files in directories and prints JSON
-records showing whether each asset is `clean`, `missing_output`,
-`missing_sidecar`, `stale`, `changed`, or `invalid`. It exits nonzero when any
-asset is not clean.
-
-Coding agents should use the thin workflow in
-[docs/visura-skill.md](docs/visura-skill.md) when authoring specs and running
-safe mock renders from natural language requests.
-
-Validate every checked-in example:
+To force a safe local provider without editing a production-bound spec:
 
 ```bash
-for spec in examples/*.visura.toml; do
-  uv run visura validate "$spec" >/dev/null
-  echo "ok: $spec"
-done
-```
-
-The validate command prints the resolved spec as formatted JSON. For example:
-
-```json
-{
-  "background": null,
-  "content": {
-    "background": "clean charcoal studio backdrop",
-    "expression": "friendly half-smile",
-    "lighting": "large softbox key light with subtle rim light",
-    "pose": "three-quarter view, relaxed shoulders",
-    "subject": "Sabhya, a software builder"
-  },
-  "kind": "headshot",
-  "model": "gpt-image-1",
-  "output": {
-    "alt": "Editorial studio headshot of Sabhya with warm polished lighting.",
-    "name": null,
-    "path": "assets/examples/my-headshot.png"
-  },
-  "output_format": "png",
-  "provider": "openai",
-  "quality": "high",
-  "references": [],
-  "seed": null,
-  "size": "1024x1024",
-  "style": {
-    "medium": "editorial studio portrait",
-    "mood": "confident, warm, polished",
-    "notes": null,
-    "palette": [
-      "charcoal",
-      "warm ivory",
-      "soft gold"
-    ]
-  }
-}
+uv run visura render examples/my-headshot.visura.toml \
+  --provider mock \
+  --model placeholder \
+  --dry-run \
+  --json
 ```
 
 ## Spec Format
 
-A Visura spec is a TOML file with a small top-level envelope plus structured
-content:
-
-```toml
-kind = "headshot"
-provider = "openai"
-model = "gpt-image-1"
-size = "1024x1024"
-quality = "high"
-output_format = "png"
-
-[output]
-path = "assets/examples/my-headshot.png"
-alt = "Editorial studio headshot of Sabhya with warm polished lighting."
-
-[style]
-medium = "editorial studio portrait"
-mood = "confident, warm, polished"
-palette = ["charcoal", "warm ivory", "soft gold"]
-
-[content]
-subject = "Sabhya, a software builder"
-pose = "three-quarter view, relaxed shoulders"
-expression = "friendly half-smile"
-background = "clean charcoal studio backdrop"
-lighting = "large softbox key light with subtle rim light"
-```
-
-Supported top-level fields:
-
-- `kind` - required string. Names the type of image spec, such as `headshot` or
-  `infographic`.
-- `model` - required string. The provider model name.
-- `provider` - optional string, defaults to `openai`. Registered providers are
-  `mock`, `openai`, and `bfl`.
-- `size` - optional string, defaults to `1024x1024`.
-- `seed` - optional integer.
-- `quality` - optional string.
-- `output_format` - optional string, one of `png`, `jpeg`, or `webp`; defaults
-  to `png`.
-- `background` - optional string.
-- `[output]` - required output metadata with repo-relative `path`, `alt`, and
-  optional `name`.
-- `[style]` - optional style guidance with `medium`, `mood`, `palette`, and
-  `notes`.
-- `[[references]]` - optional reference images with `path`, `role`, and
-  `prompt`.
-- `[content]` - required table containing kind-specific image content.
-
-Unknown top-level fields and unknown fields inside `output`, `style`, or
-`references` are rejected so typos fail fast.
-
-Built-in compilers currently support `anime_character`, `blueprint`,
-`comic_panel`, `headshot`, `infographic`, `poster`, and `product_mockup`.
-
-### Black Forest Labs
-
-Use `provider = "bfl"` for Black Forest Labs FLUX models. Model names map to BFL
-API endpoint names, so cheap FLUX.2 [klein] iteration can use
-`model = "flux-2-klein-4b"` or `model = "flux-2-klein-9b-preview"`.
-
-```toml
-kind = "product_mockup"
-provider = "bfl"
-model = "flux-2-klein-4b"
-size = "1024x1024"
-seed = 1234
-output_format = "png"
-
-[output]
-path = "assets/examples/bfl-klein-desk-lamp.png"
-alt = "Product mockup of a compact brushed aluminum desk lamp on a walnut desk."
-
-[content]
-product = "a compact desk lamp with brushed aluminum joints"
-scene = "on a walnut desk beside a notebook and matte black pen"
-lighting = "soft afternoon window light"
-```
-
-BFL text-to-image sizes must be `WIDTHxHEIGHT`, use dimensions that are
-multiples of 16, and stay within the documented 64x64 minimum and 4 megapixel
-maximum. BFL currently accepts `png` and `jpeg` output formats in Visura.
-
-Render through BFL by setting `BFL_API_KEY` and passing `--yes` to acknowledge
-that this command can spend credits:
-
-```bash
-BFL_API_KEY=... uv run visura render examples/bfl-klein-desk-lamp.visura.toml --yes
-```
-
-### Mock Rendering
-
-Use `provider = "mock"` for local development, tests, and CI. Mock rendering is
-deterministic and does not use the network:
+A Visura spec is a small TOML envelope plus flexible structured content:
 
 ```toml
 kind = "poster"
@@ -292,130 +113,131 @@ output_format = "png"
 path = "assets/examples/workshop-poster.png"
 alt = "Risograph-style workshop poster for Prompt Craft Night."
 
+[style]
+medium = "risograph event poster"
+mood = "hands-on, lively, approachable"
+palette = ["tomato red", "deep teal", "warm paper", "black"]
+
 [content]
 headline = "Make Images That Listen"
 details = "Friday, 7 PM, Studio 12"
 visual = "overhead view of hands arranging paper prompt cards around a glowing monitor"
+constraints = "clear headline, playful composition, no tiny body copy"
 ```
 
-Run it:
+Supported top-level fields:
+
+- `kind` - required string, such as `poster`, `headshot`, or `infographic`.
+- `model` - required provider model name.
+- `provider` - optional string, defaults to `openai`; use `mock` for local
+  development or `diffusers` for local model rendering.
+- `size` - optional string, defaults to `1024x1024`.
+- `seed` - optional integer.
+- `quality` - optional string.
+- `output_format` - optional string, one of `png`, `jpeg`, or `webp`.
+- `background` - optional string.
+- `[output]` - required `path`, `alt`, and optional `name`.
+- `[style]` - optional `medium`, `mood`, `palette`, and `notes`.
+- `[[references]]` - optional reference image declarations.
+- `[content]` - required table containing kind-specific content.
+
+Unknown top-level fields and unknown fields inside `output`, `style`, or
+`references` are rejected so typos fail fast.
+
+## Providers
+
+### Mock
+
+`provider = "mock"` is the default choice for development, tests, CI, and agent
+workflows. It never uses the network.
 
 ```bash
 uv run visura render examples/workshop-poster.visura.toml
 ```
 
-## Examples
+### Black Forest Labs
 
-### Product Mockup
+`provider = "bfl"` uses the BFL API and requires `BFL_API_KEY` plus `--yes`.
+These examples are not locally renderable without credentials.
+
+```bash
+BFL_API_KEY=... uv run visura render examples/bfl-klein-desk-lamp.visura.toml --yes
+```
+
+BFL text-to-image sizes must be `WIDTHxHEIGHT`, use dimensions that are
+multiples of 16, and stay between 64x64 and 4 megapixels. Visura currently
+accepts `png` and `jpeg` output formats for BFL.
+
+### OpenAI
+
+OpenAI specs can be validated and compiled, but production rendering is planned
+for a later milestone. Treat OpenAI examples as prompt/spec examples unless the
+backend has been explicitly promoted in the current checkout.
+
+```bash
+uv run visura validate examples/my-headshot.visura.toml
+uv run visura compile examples/my-headshot.visura.toml
+```
+
+### Diffusers
+
+`provider = "diffusers"` uses Hugging Face Diffusers locally. Install the
+optional dependencies first:
+
+```bash
+uv sync --extra diffusers
+```
+
+The tiny Diffusers plumbing model is useful for smoke tests:
 
 ```toml
-kind = "product_mockup"
-provider = "openai"
-model = "gpt-image-1"
-size = "1024x1024"
-quality = "high"
+kind = "poster"
+provider = "diffusers"
+model = "hf-internal-testing/tiny-stable-diffusion-pipe"
+size = "64x64"
+seed = 1234
 output_format = "png"
 
 [output]
-path = "assets/examples/coffee-packaging-mockup.png"
-alt = "Premium product mockup of a Northstar coffee pouch on a stone counter."
-
-[style]
-medium = "premium product photography"
-mood = "bright, tactile, modern"
-palette = ["forest green", "cream", "copper"]
+path = "assets/examples/tiny-diffusers-poster.png"
+alt = "Small locally rendered poster smoke test."
 
 [content]
-product = "stand-up pouch for a small-batch coffee brand named Northstar"
-surface = "matte pouch with a small copper label and simple star mark"
-scene = "on a stone counter beside a ceramic cup and scattered coffee beans"
-lighting = "soft morning window light with crisp but natural shadows"
+headline = "Local Render"
 ```
 
-Run it:
+Run with `--yes` because a Hugging Face model ID may download weights if they
+are not already cached:
 
 ```bash
-uv run visura validate examples/coffee-packaging-mockup.visura.toml
+uv run visura render path/to/tiny.visura.toml --yes
 ```
 
-### Infographic
+## Status And JSON
 
-```toml
-kind = "infographic"
-provider = "openai"
-model = "gpt-image-1"
-size = "1024x1536"
-quality = "high"
-output_format = "png"
-background = "opaque"
-
-[output]
-path = "assets/examples/launch-metrics-infographic.png"
-alt = "Vertical infographic showing launch week signups, activation, renders, and cache rate."
-
-[style]
-medium = "editorial business infographic"
-mood = "clear, energetic, credible"
-palette = ["ink black", "electric blue", "mint", "warm gray"]
-
-[content]
-title = "Launch Week Snapshot"
-sections = ["12.4k signups", "38% activation", "4.8k images rendered", "92% cache hit rate"]
-layout = "vertical poster with four metric blocks and one simple upward trend chart"
-constraints = "large readable numbers, minimal copy, no fake logos, clean grid"
-```
-
-Run it:
+`validate`, `compile`, `render`, and `status` print JSON by default. Current
+JSON is useful for inspection, but the stable agent-facing wrapper is still a
+planned milestone.
 
 ```bash
-uv run visura validate examples/launch-metrics-infographic.visura.toml
+uv run visura status examples/
 ```
 
-### Reference Images
+`status` discovers `.visura.toml` files in directories and exits nonzero when
+any asset is not clean.
 
-References are supported by the schema even though rendering is not wired up yet:
+## Recommended Next Build Order
 
-```toml
-[[references]]
-path = "references/selfie.jpg"
-role = "likeness"
-prompt = "Use only for facial likeness and hair shape."
-```
-
-Reference roles are free-form strings, but they cannot be blank.
-
-## Python API
-
-Load and validate a spec from Python:
-
-```python
-from visura import load_spec
-
-spec = load_spec("examples/my-headshot.visura.toml")
-
-print(spec.kind)
-print(spec.model)
-print(spec.content["subject"])
-```
-
-Validation failures raise `visura.loader.SpecLoadError` with a readable message:
-
-```python
-from visura.loader import SpecLoadError, load_spec
-
-try:
-    spec = load_spec("examples/my-headshot.visura.toml")
-except SpecLoadError as exc:
-    print(exc)
-```
+1. Agent-safe CLI and batch hardening: stable response wrappers, documented exit
+   codes, `--quiet`, consistent errors, complete dry-run behavior, and durable
+   provider/model overrides.
+2. Visura skill: a thin agent workflow that authors specs, defaults to mock,
+   runs the CLI, and asks before paid/networked providers.
+3. OpenAI: production rendering after mock, batch, cache, and agent guardrails
+   are stable.
+4. Provider reference/editing polish.
 
 ## Development
-
-Install dependencies:
-
-```bash
-uv sync
-```
 
 Run tests:
 
@@ -423,43 +245,25 @@ Run tests:
 uv run pytest
 ```
 
-Run linting:
+Run linting and formatting:
 
 ```bash
 uv run ruff check .
-```
-
-Format code:
-
-```bash
 uv run ruff format .
 ```
 
-Run the CLI directly from the source tree:
-
-```bash
-uv run visura validate examples/my-headshot.visura.toml
-```
-
-## Repository Layout
+Repository layout:
 
 ```text
 src/visura/
   cli.py              Typer CLI entrypoint
   loader.py           TOML parsing and validation
   spec.py             Pydantic models for the v0 spec
-  backends/           Backend capability scaffolding
-  kinds/              Future kind registry and compilers
+  compiler.py         Spec-to-prompt payload compiler
+  render.py           Cache and sidecar rendering helpers
+  status.py           Asset status inspection
+  backends/           Provider backends
+  kinds/              Built-in kind compilers
 examples/             Example .visura.toml files
-tests/                Loader and CLI tests
+tests/                Loader, CLI, backend, and e2e tests
 ```
-
-## Roadmap
-
-The next major pieces are:
-
-1. Compile structured specs into provider-ready prompt payloads.
-2. Add `visura render <spec>` with OpenAI image generation.
-3. Write sidecar metadata next to each render.
-4. Add content-addressable artifact caching for replayability.
-5. Add kind-specific content schemas and compilers.
