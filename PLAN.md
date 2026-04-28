@@ -394,6 +394,8 @@ Exit criteria:
 
 Make the agent workflow easy without making it agent-only.
 
+Current status: documented as a thin workflow in `docs/visura-skill.md`.
+
 Scope:
 
 - Draft a Visura skill that teaches agents the recommended workflow.

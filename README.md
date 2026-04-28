@@ -120,6 +120,10 @@ records showing whether each asset is `clean`, `missing_output`,
 `missing_sidecar`, `stale`, `changed`, or `invalid`. It exits nonzero when any
 asset is not clean.
 
+Coding agents should use the thin workflow in
+[docs/visura-skill.md](docs/visura-skill.md) when authoring specs and running
+safe mock renders from natural language requests.
+
 Validate every checked-in example:
 
 ```bash
