@@ -11,6 +11,14 @@ dependencies = [
     "typer>=0.12.0",
 ]
 
+[project.optional-dependencies]
+diffusers = [
+    "accelerate>=0.30.0",
+    "diffusers>=0.30.0",
+    "torch>=2.2.0",
+    "transformers>=4.40.0,<5",
+]
+
 [project.scripts]
 visura = "visura.cli:app"
 

@@ -189,7 +189,7 @@ def test_builtin_kinds_are_registered() -> None:
 
 
 def test_default_backend_is_registered() -> None:
-    assert registered_backends() == ("bfl", "mock", "openai")
+    assert registered_backends() == ("bfl", "diffusers", "mock", "openai")
 
 
 def test_bfl_backend_accepts_flux_klein() -> None:
