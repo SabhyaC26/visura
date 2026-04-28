@@ -109,6 +109,18 @@ The render command writes the requested output, writes a sidecar next to it, and
 stores the artifact in `.visura/cache`. Rendering the same unchanged spec again
 restores from cache; use `--force` to refresh the cached artifact.
 
+Render through OpenAI by setting `OPENAI_API_KEY` and passing `--yes` to
+acknowledge that the command can spend credits:
+
+```bash
+OPENAI_API_KEY=... uv run visura render examples/my-headshot.visura.toml --yes
+```
+
+The OpenAI backend currently targets `model = "gpt-image-1"` with sizes
+`1024x1024`, `1536x1024`, `1024x1536`, or `auto`; qualities `low`, `medium`,
+`high`, or `auto`; and `png`, `jpeg`, or `webp` output. `seed` and reference
+images are rejected for OpenAI generation before any API call.
+
 Inspect specs and their generated artifacts:
 
 ```bash
