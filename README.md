@@ -233,9 +233,11 @@ any asset is not clean.
    provider/model overrides.
 2. Visura skill: a thin agent workflow that authors specs, defaults to mock,
    runs the CLI, and asks before paid/networked providers.
-3. OpenAI: production rendering after mock, batch, cache, and agent guardrails
+3. Diffusers hardening: keep the local path optional, document practical models,
+   and clarify hardware/download behavior.
+4. OpenAI: production rendering after mock, batch, cache, and agent guardrails
    are stable.
-4. Provider reference/editing polish.
+5. Provider reference/editing polish.
 
 ## Development
 

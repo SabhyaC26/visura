@@ -19,6 +19,7 @@ Implemented:
   digest, references, timestamp, and cache decision.
 - Status inspection for clean, missing, stale, changed, and invalid assets.
 - BFL rendering path gated by API key and `--yes`.
+- First optional Diffusers rendering path for local model execution.
 - Example specs for common asset types.
 
 Partially implemented:
@@ -35,7 +36,6 @@ Not implemented:
 - `--quiet`.
 - Stable structured error objects and exit-code docs.
 - A packaged Visura skill.
-- Diffusers/local model rendering.
 - Production OpenAI rendering.
 
 ## Product Shape
@@ -67,7 +67,7 @@ paid render unless the user explicitly approves it.
 | `mock` | Implemented | Default local, CI, and agent-safe render backend |
 | `bfl` | Rendering path exists | Networked paid/high-quality backend behind key + `--yes` |
 | `openai` | Scaffold-only for the current milestone | Future paid production backend |
-| `diffusers` | Not implemented | Future local real-image iteration backend |
+| `diffusers` | First optional path exists | Local real-image iteration backend, still needs hardening and docs |
 
 ## CLI Contract Gap
 
@@ -98,11 +98,10 @@ The next work should turn the current useful JSON output into a stable contract:
    asks before paid or networked providers. The skill should not own schema or
    rendering logic.
 
-3. **Diffusers backend**
+3. **Diffusers hardening**
 
-   Add optional local real-image rendering after the CLI contract is safe enough
-   for agents and CI. Start with a tiny plumbing model, then document a practical
-   local draft model.
+   Keep the new local rendering path optional, verify the tiny plumbing model,
+   document a practical draft model, and clarify hardware/download behavior.
 
 4. **OpenAI backend**
 
@@ -128,14 +127,15 @@ Completed milestones:
 - M4 Cache and sidecars: traceable, cache-first rendering.
 - M5 Status baseline: inspect outputs, sidecars, cache, and spec drift.
 - M6 BFL path: first networked provider render path.
+- M7 Diffusers baseline: first optional local model render path.
 
 Next milestones:
 
-- M7 Agent-safe CLI and batch contract.
-- M8 Visura skill.
-- M9 Diffusers local backend.
-- M10 OpenAI production backend.
-- M11 Reference/edit workflows and distribution.
+- M8 Agent-safe CLI and batch contract.
+- M9 Visura skill.
+- M10 Diffusers hardening and docs.
+- M11 OpenAI production backend.
+- M12 Reference/edit workflows and distribution.
 
 ## Success Criteria
 
@@ -145,4 +145,5 @@ Next milestones:
 - Unchanged renders hit cache by default.
 - Sidecars make generated assets auditable without reading logs.
 - Paid or networked renders require explicit approval.
-- Diffusers and OpenAI arrive after the local/agent-safe loop is solid.
+- Diffusers stays optional and local-first; OpenAI arrives after the
+  local/agent-safe loop is solid.

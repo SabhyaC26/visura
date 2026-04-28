@@ -35,6 +35,7 @@ sidecar, and cache state.
 - `compiler.py` turns flexible content into provider-ready prompt payloads.
 - `backends/mock.py` renders deterministic local placeholders.
 - `backends/bfl.py` contains the networked BFL rendering path.
+- `backends/diffusers.py` contains the optional local Diffusers rendering path.
 - `render.py` computes render hashes, restores/writes cache entries, and writes
   sidecars.
 - `status.py` discovers specs and reports asset state.
@@ -47,7 +48,7 @@ sidecar, and cache state.
 | `mock` | Implemented | Local, deterministic, no network, suitable for CI |
 | `bfl` | Implemented path | Requires `BFL_API_KEY` and `--yes` |
 | `openai` | Scaffold-only in current docs | Planned paid production backend |
-| `diffusers` | Planned | Optional local real-image backend |
+| `diffusers` | First optional path exists | Local model execution, still needs hardening and docs |
 
 Provider differences should be explicit capability checks, not hidden behavior.
 Unsupported options should fail before spending money or writing files.
@@ -93,7 +94,7 @@ backend identity, compiler version, Visura version, and reference digests.
 
 1. Agent-safe CLI and batch contract.
 2. Thin Visura skill for coding agents.
-3. Optional Diffusers backend.
+3. Diffusers hardening and documentation.
 4. Production OpenAI backend.
 5. Provider reference/edit workflows.
 
