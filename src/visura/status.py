@@ -26,6 +26,8 @@ class AssetStatus(BaseModel):
     ok: bool
     state: StatusState
     error: str | None = None
+    error_code: str | None = None
+    error_field: str | None = None
     output_path: str | None = None
     sidecar_path: str | None = None
     provider: str | None = None
@@ -58,11 +60,18 @@ def status_for_path(path: Path) -> AssetStatus:
         payload = compile_spec(spec)
         backend = get_backend(spec.provider)
     except (SpecLoadError, CompileError, KeyError) as exc:
+        error_code = "compile_error"
+        error_field = None
+        if isinstance(exc, SpecLoadError):
+            error_code = exc.code
+            error_field = exc.issues[0].field if exc.issues else None
         return AssetStatus(
             spec_path=str(path),
             ok=False,
             state="invalid",
             error=str(exc),
+            error_code=error_code,
+            error_field=error_field,
         )
 
     output_path = Path(spec.output.path)

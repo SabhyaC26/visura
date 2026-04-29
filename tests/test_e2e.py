@@ -57,25 +57,39 @@ def read_json(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def response(stdout: str) -> dict[str, object]:
+    return json.loads(stdout)
+
+
+def first_result(stdout: str) -> dict[str, object]:
+    payload = response(stdout)
+    return payload["results"][0]  # type: ignore[index]
+
+
+def results(stdout: str) -> list[dict[str, object]]:
+    payload = response(stdout)
+    return payload["results"]  # type: ignore[return-value]
+
+
 def test_e2e_validate_compile_render_and_cache_restore(tmp_path: Path) -> None:
     spec_path = write_poster_spec(tmp_path)
 
     validate = run_visura(tmp_path, "validate", str(spec_path))
     assert validate.returncode == 0
-    validated = json.loads(validate.stdout)
+    validated = first_result(validate.stdout)
     assert validated["kind"] == "poster"
     assert validated["output"]["path"] == "assets/workshop-poster.png"
 
     compile_result = run_visura(tmp_path, "compile", str(spec_path))
     assert compile_result.returncode == 0
-    compiled = json.loads(compile_result.stdout)
+    compiled = first_result(compile_result.stdout)
     assert compiled["kind"] == "poster"
     assert "Make Images That Listen" in compiled["prompt"]
     assert compiled["output"]["path"] == "assets/workshop-poster.png"
 
     first_render = run_visura(tmp_path, "render", str(spec_path))
     assert first_render.returncode == 0
-    first_payload = json.loads(first_render.stdout)
+    first_payload = first_result(first_render.stdout)
     assert first_payload["cache"] == "miss"
     assert first_payload["render_hash"].startswith("sha256:")
     assert first_payload["output_digest"].startswith("sha256:")
@@ -95,7 +109,7 @@ def test_e2e_validate_compile_render_and_cache_restore(tmp_path: Path) -> None:
     output_path.unlink()
     second_render = run_visura(tmp_path, "render", str(spec_path))
     assert second_render.returncode == 0
-    second_payload = json.loads(second_render.stdout)
+    second_payload = first_result(second_render.stdout)
     assert second_payload["cache"] == "hit"
     assert second_payload["render_hash"] == first_payload["render_hash"]
     assert second_payload["output_digest"] == first_payload["output_digest"]
@@ -110,8 +124,8 @@ def test_e2e_force_refresh_updates_sidecar_without_changing_hash(tmp_path: Path)
 
     assert first_render.returncode == 0
     assert forced_render.returncode == 0
-    first_payload = json.loads(first_render.stdout)
-    forced_payload = json.loads(forced_render.stdout)
+    first_payload = first_result(first_render.stdout)
+    forced_payload = first_result(forced_render.stdout)
     sidecar = read_json(tmp_path / "assets" / "workshop-poster.visura.json")
 
     assert first_payload["cache"] == "miss"
@@ -126,7 +140,7 @@ def test_e2e_spec_change_invalidates_render_cache(tmp_path: Path) -> None:
 
     first_render = run_visura(tmp_path, "render", str(spec_path))
     assert first_render.returncode == 0
-    first_payload = json.loads(first_render.stdout)
+    first_payload = first_result(first_render.stdout)
 
     text = spec_path.read_text(encoding="utf-8")
     spec_path.write_text(
@@ -139,7 +153,7 @@ def test_e2e_spec_change_invalidates_render_cache(tmp_path: Path) -> None:
 
     second_render = run_visura(tmp_path, "render", str(spec_path))
     assert second_render.returncode == 0
-    second_payload = json.loads(second_render.stdout)
+    second_payload = first_result(second_render.stdout)
     sidecar = read_json(tmp_path / "assets" / "workshop-poster.visura.json")
 
     assert second_payload["cache"] == "miss"
@@ -203,7 +217,9 @@ headline = "Make Images That Listen"
 
     assert result.returncode == 1
     assert "surprise: Extra inputs are not permitted" in result.stderr
-    assert result.stdout == ""
+    payload = response(result.stdout)
+    assert payload["ok"] is False
+    assert payload["errors"][0]["field"] == "surprise"  # type: ignore[index]
 
 
 def test_e2e_paid_provider_requires_explicit_yes(tmp_path: Path) -> None:
@@ -260,7 +276,7 @@ headline = "Make Images That Listen"
 
     assert render.returncode == 0
     assert status.returncode == 1
-    payload = json.loads(status.stdout)
+    payload = results(status.stdout)
     by_path = {item["spec_path"]: item for item in payload}
 
     rendered = by_path[str(spec_path.relative_to(tmp_path))]

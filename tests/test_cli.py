@@ -8,6 +8,20 @@ from typer.testing import CliRunner
 from visura.cli import app
 
 
+def response(stdout: str) -> dict[str, object]:
+    return json.loads(stdout)
+
+
+def first_result(stdout: str) -> dict[str, object]:
+    payload = response(stdout)
+    return payload["results"][0]  # type: ignore[index]
+
+
+def results(stdout: str) -> list[dict[str, object]]:
+    payload = response(stdout)
+    return payload["results"]  # type: ignore[return-value]
+
+
 def write_poster_spec(
     path: Path,
     *,
@@ -40,7 +54,12 @@ def test_validate_example() -> None:
     result = CliRunner().invoke(app, ["validate", "examples/my-headshot.visura.toml"])
 
     assert result.exit_code == 0
-    assert '"kind": "headshot"' in result.stdout
+    payload = response(result.stdout)
+    assert payload["schema_version"] == "0.1"
+    assert payload["command"] == "validate"
+    assert payload["ok"] is True
+    assert payload["errors"] == []
+    assert first_result(result.stdout)["kind"] == "headshot"
 
 
 def test_version() -> None:
@@ -54,9 +73,14 @@ def test_compile_example() -> None:
     result = CliRunner().invoke(app, ["compile", "examples/workshop-poster.visura.toml"])
 
     assert result.exit_code == 0
-    assert '"kind": "poster"' in result.stdout
-    assert '"prompt":' in result.stdout
-    assert '"path": "assets/examples/workshop-poster.png"' in result.stdout
+    payload = response(result.stdout)
+    compiled = first_result(result.stdout)
+    assert payload["schema_version"] == "0.1"
+    assert payload["command"] == "compile"
+    assert payload["ok"] is True
+    assert compiled["kind"] == "poster"
+    assert "prompt" in compiled
+    assert compiled["output"]["path"] == "assets/examples/workshop-poster.png"
 
 
 def test_compile_provider_model_override_accepts_json_option(tmp_path: Path) -> None:
@@ -82,7 +106,7 @@ def test_compile_provider_model_override_accepts_json_option(tmp_path: Path) -> 
     )
 
     assert result.exit_code == 0
-    payload = json.loads(result.stdout)
+    payload = first_result(result.stdout)
     assert payload["provider"] == "mock"
     assert payload["model"] == "placeholder"
 
@@ -161,6 +185,35 @@ event = "No headline"
 
     assert result.exit_code == 1
     assert "poster content is missing required field(s): headline" in result.stderr
+    payload = response(result.stdout)
+    assert payload["ok"] is False
+    assert payload["results"] == []
+    assert payload["errors"][0]["code"] == "compile_error"  # type: ignore[index]
+
+
+def test_compile_quiet_suppresses_stderr(tmp_path: Path) -> None:
+    spec_path = tmp_path / "poster.visura.toml"
+    spec_path.write_text(
+        """
+kind = "poster"
+provider = "mock"
+model = "placeholder"
+
+[output]
+path = "assets/poster.png"
+alt = "Poster."
+
+[content]
+event = "No headline"
+""",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["compile", str(spec_path), "--quiet"])
+
+    assert result.exit_code == 1
+    assert result.stderr == ""
+    assert response(result.stdout)["errors"][0]["code"] == "compile_error"  # type: ignore[index]
 
 
 def test_render_mock_writes_output(tmp_path: Path) -> None:
@@ -216,11 +269,15 @@ product = "desk lamp"
 
     assert result.exit_code == 1
     assert "requires --yes" in result.stderr
-    payload = json.loads(result.stdout)
+    payload = response(result.stdout)
+    item = payload["results"][0]  # type: ignore[index]
+    error = payload["errors"][0]  # type: ignore[index]
     assert payload["ok"] is False
-    assert payload["provider"] == "bfl"
-    assert payload["model"] == "flux-2-klein-4b"
-    assert payload["cache"] is None
+    assert item["ok"] is False
+    assert item["provider"] == "bfl"
+    assert item["model"] == "flux-2-klein-4b"
+    assert item["cache"] is None
+    assert error["code"] == "provider_requires_approval"
 
 
 def test_render_batch_directory_with_multiple_mock_specs(tmp_path: Path) -> None:
@@ -239,7 +296,7 @@ def test_render_batch_directory_with_multiple_mock_specs(tmp_path: Path) -> None
         result = CliRunner().invoke(app, ["render", "assets", "--json"])
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = results(result.stdout)
         assert [item["spec_path"] for item in payload] == [
             "assets/one.visura.toml",
             "assets/two.visura.toml",
@@ -270,7 +327,7 @@ def test_render_expands_quoted_glob(tmp_path: Path) -> None:
         result = CliRunner().invoke(app, ["render", "assets/*.visura.toml", "--dry-run"])
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = results(result.stdout)
         assert [item["spec_path"] for item in payload] == [
             "assets/one.visura.toml",
             "assets/two.visura.toml",
@@ -287,7 +344,7 @@ def test_render_dry_run_writes_nothing(tmp_path: Path) -> None:
         result = CliRunner().invoke(app, ["render", "poster.visura.toml", "--dry-run"])
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = first_result(result.stdout)
         assert payload["ok"] is True
         assert payload["dry_run"] is True
         assert payload["cache"] == "miss"
@@ -324,7 +381,7 @@ def test_render_provider_override_uses_mock_without_editing_spec(tmp_path: Path)
         )
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = first_result(result.stdout)
         sidecar = json.loads(Path("assets/poster.visura.json").read_text(encoding="utf-8"))
         assert payload["ok"] is True
         assert payload["provider"] == "mock"
@@ -359,7 +416,7 @@ headline = "Make Images That Listen"
         result = CliRunner().invoke(app, ["render", str(spec_path)])
 
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = first_result(result.stdout)
         sidecar = json.loads(Path("assets/poster.visura.json").read_text(encoding="utf-8"))
 
         assert payload["cache"] == "miss"
@@ -398,8 +455,8 @@ headline = "Make Images That Listen"
         Path("assets/poster.png").unlink()
         second = CliRunner().invoke(app, ["render", str(spec_path)])
 
-        first_payload = json.loads(first.stdout)
-        second_payload = json.loads(second.stdout)
+        first_payload = first_result(first.stdout)
+        second_payload = first_result(second.stdout)
         sidecar = json.loads(Path("assets/poster.visura.json").read_text(encoding="utf-8"))
 
         assert first.exit_code == 0
@@ -435,8 +492,8 @@ headline = "Make Images That Listen"
         first = CliRunner().invoke(app, ["render", str(spec_path)])
         forced = CliRunner().invoke(app, ["render", str(spec_path), "--force"])
 
-        first_payload = json.loads(first.stdout)
-        forced_payload = json.loads(forced.stdout)
+        first_payload = first_result(first.stdout)
+        forced_payload = first_result(forced.stdout)
 
         assert first.exit_code == 0
         assert forced.exit_code == 0
@@ -498,7 +555,7 @@ headline = "Make Images That Listen"
 
         assert render.exit_code == 0
         assert result.exit_code == 0
-        payload = json.loads(result.stdout)
+        payload = results(result.stdout)
         assert payload[0]["ok"] is True
         assert payload[0]["state"] == "clean"
         assert payload[0]["output_exists"] is True
@@ -540,7 +597,7 @@ headline = "Make Images That Listen"
 
         assert render.exit_code == 0
         assert result.exit_code == 1
-        payload = json.loads(result.stdout)
+        payload = results(result.stdout)
         assert payload[0]["ok"] is False
         assert payload[0]["state"] == "stale"
         assert payload[0]["current_render_hash"] != payload[0]["sidecar_render_hash"]
@@ -573,7 +630,7 @@ headline = "Make Images That Listen"
 
         assert render.exit_code == 0
         assert result.exit_code == 1
-        payload = json.loads(result.stdout)
+        payload = results(result.stdout)
         assert payload[0]["ok"] is False
         assert payload[0]["state"] == "missing_sidecar"
         assert payload[0]["output_exists"] is True
@@ -601,7 +658,7 @@ event = "No headline"
     result = CliRunner().invoke(app, ["status", str(spec_path)])
 
     assert result.exit_code == 1
-    payload = json.loads(result.stdout)
+    payload = results(result.stdout)
     assert payload[0]["ok"] is False
     assert payload[0]["state"] == "invalid"
     assert "poster content is missing required field(s): headline" in payload[0]["error"]

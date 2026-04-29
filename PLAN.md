@@ -21,20 +21,20 @@ Implemented:
 - BFL rendering path gated by API key and `--yes`.
 - First optional Diffusers rendering path for local model execution.
 - Example specs for common asset types.
+- Versioned CLI response wrappers with `schema_version`, `command`, `ok`,
+  `results`, and structured `errors`.
+- `--quiet` for suppressing human-readable stderr summaries.
+- Batch render/status behavior for files, directories, and globs.
 
 Partially implemented:
 
-- JSON is printed by default and `--json` exists, but the stable response
-  wrapper is not final.
 - `render` has `--dry-run`, `--force`, `--yes`, `--provider`, and `--model`;
   provider/model overrides also exist for `compile`.
-- Directory/glob collection exists, but batch behavior needs a documented,
-  tested agent contract.
+- Provider/model override semantics are in place for compile/render, but future
+  provider-specific capabilities still need more documentation.
 
 Not implemented:
 
-- `--quiet`.
-- Stable structured error objects and exit-code docs.
 - A packaged Visura skill.
 - Production OpenAI rendering.
 
@@ -69,9 +69,9 @@ paid render unless the user explicitly approves it.
 | `openai` | Scaffold-only for the current milestone | Future paid production backend |
 | `diffusers` | First optional path exists | Local real-image iteration backend, still needs hardening and docs |
 
-## CLI Contract Gap
+## CLI Contract
 
-The next work should turn the current useful JSON output into a stable contract:
+The current agent-facing CLI contract is:
 
 - Versioned response wrappers with `schema_version`, `command`, `ok`, and
   `results`.
@@ -79,37 +79,31 @@ The next work should turn the current useful JSON output into a stable contract:
   available.
 - `--quiet` for minimal logs.
 - Consistent dry-run behavior for commands with write or cost side effects.
-- Complete provider/model override semantics for safe local rendering.
+- Provider/model override semantics for safe local rendering.
 - Documented exit codes.
 - Logs and progress on stderr whenever JSON is on stdout.
 
 ## Recommended Next Build Order
 
-1. **Agent-safe CLI and batch hardening**
-
-   Finish the machine contract before adding more backends: stable wrappers,
-   structured errors, `--quiet`, documented exit codes, batch render/status
-   tests, and consistent dry-run/provider/model override behavior.
-
-2. **Visura skill**
+1. **Visura skill**
 
    Add a thin skill that turns natural language into specs, defaults to
    `provider = "mock"`, runs `validate`, `compile`, `render`, and `status`, and
    asks before paid or networked providers. The skill should not own schema or
    rendering logic.
 
-3. **Diffusers hardening**
+2. **Diffusers hardening**
 
    Keep the new local rendering path optional, verify the tiny plumbing model,
    document a practical draft model, and clarify hardware/download behavior.
 
-4. **OpenAI backend**
+3. **OpenAI backend**
 
    Promote OpenAI from scaffold to production rendering after local and
    agent-safe workflows are stable. Paid renders must be cache-first,
    sidecar-backed, and require explicit approval.
 
-5. **Provider polish**
+4. **Provider polish**
 
    Add reference/image-editing support, provider-specific capability docs, and
    distribution polish.
@@ -128,10 +122,10 @@ Completed milestones:
 - M5 Status baseline: inspect outputs, sidecars, cache, and spec drift.
 - M6 BFL path: first networked provider render path.
 - M7 Diffusers baseline: first optional local model render path.
+- M8 Agent-safe CLI and batch contract.
 
 Next milestones:
 
-- M8 Agent-safe CLI and batch contract.
 - M9 Visura skill.
 - M10 Diffusers hardening and docs.
 - M11 OpenAI production backend.

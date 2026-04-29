@@ -16,8 +16,8 @@ current milestone, and Diffusers has a first optional local rendering path.
 Implemented today:
 
 - `.visura.toml` loading and Pydantic validation.
-- `visura validate <path>` for resolved spec JSON.
-- `visura compile <path>` for inspectable prompt payload JSON.
+- `visura validate <path>` for resolved spec JSON in a stable response wrapper.
+- `visura compile <path>` for inspectable prompt payload JSON in a stable response wrapper.
 - `visura render <path>` for deterministic local `mock` renders.
 - Render cache under `.visura/cache`.
 - Sidecar metadata next to outputs, such as `assets/poster.visura.json`.
@@ -27,16 +27,17 @@ Implemented today:
 - A Diffusers rendering path for optional local model execution.
 - Built-in compilers for `anime_character`, `blueprint`, `comic_panel`,
   `headshot`, `infographic`, `poster`, and `product_mockup`.
+- Agent-safe CLI responses with `schema_version`, `command`, `ok`, `results`,
+  and structured `errors`.
+- `--quiet` for suppressing human-readable stderr summaries.
 
 Partially implemented:
 
-- CLI JSON output exists by default, and `--json` is accepted, but stable
-  versioned response wrappers are still planned.
 - `render` has `--dry-run`, `--force`, `--yes`, `--provider`, and `--model`;
-  `compile` has provider/model overrides. `--quiet` and a full cross-command
-  agent contract are still planned.
-- `render` accepts files, directories, and globs, but the next milestone should
-  harden batch behavior, response shape, and examples for agent use.
+  `compile` has provider/model overrides.
+- `render` and `status` accept files, directories, and globs. The batch
+  contract is stable for current commands, while provider-specific workflows
+  still need capability polish.
 
 Not implemented yet:
 
@@ -213,11 +214,46 @@ are not already cached:
 uv run visura render path/to/tiny.visura.toml --yes
 ```
 
-## Status And JSON
+## CLI JSON Contract
 
-`validate`, `compile`, `render`, and `status` print JSON by default. Current
-JSON is useful for inspection, but the stable agent-facing wrapper is still a
-planned milestone.
+`validate`, `compile`, `render`, and `status` print JSON to stdout by default.
+`--json` is accepted for explicit callers. Every command response uses the same
+wrapper:
+
+```json
+{
+  "schema_version": "0.1",
+  "command": "render",
+  "ok": true,
+  "results": [],
+  "errors": []
+}
+```
+
+`results` is always a list, including single-spec commands. `errors` contains
+objects with stable fields:
+
+```json
+{
+  "code": "spec_validation_error",
+  "message": "Extra inputs are not permitted",
+  "path": "assets/poster.visura.toml",
+  "field": "surprise"
+}
+```
+
+Human-readable error summaries are written to stderr. Use `--quiet` to suppress
+those summaries and keep only the JSON response.
+
+Batch commands sort and deduplicate discovered specs. Directory inputs recurse
+for `*.visura.toml`, quoted globs are expanded by Visura, and a batch exits
+nonzero if any item fails or reports a non-clean status.
+
+Exit codes:
+
+- `0` - command completed and `ok` is `true`.
+- `1` - validation, compile, render, status, discovery, provider, filesystem,
+  or approval failure; inspect `errors` for machine-readable details.
 
 ```bash
 uv run visura status examples/

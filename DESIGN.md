@@ -55,20 +55,25 @@ Unsupported options should fail before spending money or writing files.
 
 ## CLI Design
 
-Current CLI output is JSON by default. That is useful, but agent compatibility
-needs a stable contract:
+CLI output is JSON by default and uses a stable agent-facing wrapper:
 
 ```json
 {
   "schema_version": "0.1",
   "command": "render",
   "ok": true,
-  "results": []
+  "results": [],
+  "errors": []
 }
 ```
 
-The current implementation should be treated as provisional until this wrapper,
-structured errors, `--quiet`, exit-code docs, and batch guarantees are complete.
+`results` is always a list. `errors` contains structured objects with `code`,
+`message`, `path`, and `field` when a field location is available. Human-readable
+summaries go to stderr and can be suppressed with `--quiet`.
+
+`render` and `status` accept files, directories, and globs. Visura sorts and
+deduplicates discovered specs, reports every item it can inspect, and exits
+nonzero when any item fails or when status finds a non-clean asset.
 
 Commands with side effects should support dry-run planning. Commands that may
 spend money or use the network should require explicit approval such as `--yes`.
@@ -92,11 +97,10 @@ backend identity, compiler version, Visura version, and reference digests.
 
 ## Recommended Next Build Order
 
-1. Agent-safe CLI and batch contract.
-2. Thin Visura skill for coding agents.
-3. Diffusers hardening and documentation.
-4. Production OpenAI backend.
-5. Provider reference/edit workflows.
+1. Thin Visura skill for coding agents.
+2. Diffusers hardening and documentation.
+3. Production OpenAI backend.
+4. Provider reference/edit workflows.
 
 This order keeps the local, auditable loop stable before adding more expensive
 or environment-sensitive rendering paths.
